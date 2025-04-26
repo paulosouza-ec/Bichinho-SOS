@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
-import { executeSql } from '../services/database';
+import { authService } from '../services/database';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -8,18 +8,10 @@ const LoginScreen = ({ navigation }) => {
 
   const handleLogin = async () => {
     try {
-      const result = await executeSql(
-        'SELECT * FROM users WHERE email = ? AND password = ?',
-        [email, password]
-      );
-      
-      if (result.rows.length > 0) {
-        navigation.navigate('Home', { userId: result.rows.item(0).id });
-      } else {
-        Alert.alert('Erro', 'Email ou senha incorretos');
-      }
+      const user = await authService.loginUser(email, password);
+      navigation.navigate('Home', { userId: user.id });
     } catch (error) {
-      Alert.alert('Erro', 'Ocorreu um erro ao fazer login');
+      Alert.alert('Erro', error.message);
     }
   };
 
@@ -69,4 +61,5 @@ const styles = StyleSheet.create({
   },
 });
 
+// Exportação ESSENCIAL:
 export default LoginScreen;

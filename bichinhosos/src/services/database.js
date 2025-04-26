@@ -1,59 +1,147 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import * as SQLite from 'expo-sqlite';
+// 1. Definição de chaves com prefixo único
+const DB_KEYS = {
+  USERS: '@BichinhoSOS:users',
+  REPORTS: '@BichinhoSOS:reports'
+};
 
-// Solução compatível com Bridgeless
-const openDatabase = () => {
-  if (!SQLite.openDatabase) {
-    console.warn('SQLite.openDatabase não disponível - usando mock para web');
-    return {
-      transaction: () => ({
-        executeSql: () => ({ rowsAffected: 0, insertId: undefined, rows: { _array: [] } }),
-      }),
-    };
+// 2. Função auxiliar para tratamento seguro de JSON
+const safeJsonParse = (data) => {
+  try {
+    return data ? JSON.parse(data) : null;
+  } catch (error) {
+    console.error('Erro ao fazer parse do JSON:', error);
+    return null;
   }
-  return SQLite.openDatabase('denuncias.db');
 };
 
-const db = openDatabase();
+// 3. Inicialização do banco de dados
+export const initDB = async () => {
+  try {
+    // Verifica e inicializa usuários
+    let users = await AsyncStorage.getItem(DB_KEYS.USERS);
+    if (!users) {
+      await AsyncStorage.setItem(DB_KEYS.USERS, JSON.stringify([]));
+      console.log('Banco de usuários inicializado');
+    }
 
-// Restante do seu código permanece igual...
-export const initDB = () => {
-  db.transaction(tx => {
-    tx.executeSql(
-      `CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL
-      );`
-    );
-    
-    tx.executeSql(
-      `CREATE TABLE IF NOT EXISTS reports (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        userId INTEGER,
-        title TEXT NOT NULL,
-        description TEXT NOT NULL,
-        location TEXT,
-        date TEXT NOT NULL,
-        isAnonymous BOOLEAN DEFAULT 0,
-        FOREIGN KEY (userId) REFERENCES users (id)
-      );`
-    );
-  });
+    // Verifica e inicializa denúncias
+    let reports = await AsyncStorage.getItem(DB_KEYS.REPORTS);
+    if (!reports) {
+      await AsyncStorage.setItem(DB_KEYS.REPORTS, JSON.stringify([]));
+      console.log('Banco de denúncias inicializado');
+    }
+  } catch (error) {
+    console.error('Falha crítica ao inicializar DB:', error);
+    throw new Error('Não foi possível inicializar o banco de dados');
+  }
 };
 
-export const executeSql = (sql, params = []) => {
-  return new Promise((resolve, reject) => {
-    db.transaction(tx => {
-      tx.executeSql(
-        sql,
-        params,
-        (_, result) => resolve(result),
-        (_, error) => reject(error)
+// 4. Serviço de autenticação
+export const authService = {
+  registerUser: async (userData) => {
+    try {
+      const users = safeJsonParse(await AsyncStorage.getItem(DB_KEYS.USERS)) || [];
+      
+      // Verifica se o usuário já existe
+      const userExists = users.some(user => 
+        user.email.toLowerCase() === userData.email.toLowerCase()
       );
-    });
-  });
+      
+      if (userExists) {
+        throw new Error('Este e-mail já está cadastrado');
+      }
+
+      // Cria novo usuário com ID único
+      const newUser = { 
+        ...userData, 
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString()
+      };
+
+      await AsyncStorage.setItem(
+        DB_KEYS.USERS,
+        JSON.stringify([...users, newUser])
+      );
+      
+      return newUser;
+    } catch (error) {
+      console.error('Erro ao registrar usuário:', error);
+      throw error;
+    }
+  },
+
+  loginUser: async (email, password) => {
+    try {
+      const users = safeJsonParse(await AsyncStorage.getItem(DB_KEYS.USERS)) || [];
+      const user = users.find(u => 
+        u.email.toLowerCase() === email.toLowerCase() && 
+        u.password === password
+      );
+      
+      if (!user) {
+        throw new Error('E-mail ou senha incorretos');
+      }
+      
+      return user;
+    } catch (error) {
+      console.error('Erro ao fazer login:', error);
+      throw error;
+    }
+  }
 };
 
-export default db;
+// 5. Serviço de denúncias
+export const reportService = {
+  createReport: async (reportData) => {
+    try {
+      const reports = safeJsonParse(await AsyncStorage.getItem(DB_KEYS.REPORTS)) || [];
+      
+      const newReport = { 
+        ...reportData,
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      await AsyncStorage.setItem(
+        DB_KEYS.REPORTS,
+        JSON.stringify([...reports, newReport])
+      );
+      
+      return newReport;
+    } catch (error) {
+      console.error('Erro ao criar denúncia:', error);
+      throw error;
+    }
+  },
+
+  getReports: async (userId = null) => {
+    try {
+      const reports = safeJsonParse(await AsyncStorage.getItem(DB_KEYS.REPORTS)) || [];
+      
+      if (userId) {
+        return reports.filter(r => 
+          !r.isAnonymous && r.userId === userId
+        ).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      }
+      
+      return reports.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    } catch (error) {
+      console.error('Erro ao buscar denúncias:', error);
+      throw error;
+    }
+  },
+
+  // Novo método para buscar uma denúncia específica
+  getReportById: async (reportId) => {
+    try {
+      const reports = safeJsonParse(await AsyncStorage.getItem(DB_KEYS.REPORTS)) || [];
+      return reports.find(r => r.id === reportId);
+    } catch (error) {
+      console.error('Erro ao buscar denúncia:', error);
+      throw error;
+    }
+  }
+};

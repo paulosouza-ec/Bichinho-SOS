@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
-import { executeSql } from '../services/database';
+import { authService } from '../services/database';
 
 const RegisterScreen = ({ navigation }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
     if (!name || !email || !password) {
@@ -13,16 +14,16 @@ const RegisterScreen = ({ navigation }) => {
       return;
     }
 
+    setLoading(true);
     try {
-      await executeSql(
-        'INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
-        [name, email, password]
-      );
-      Alert.alert('Sucesso', 'Cadastro realizado com sucesso!', [
-        { text: 'OK', onPress: () => navigation.navigate('Login') },
+      await authService.registerUser({ name, email, password });
+      Alert.alert('Sucesso', 'Cadastro realizado!', [
+        { text: 'OK', onPress: () => navigation.navigate('Login') }
       ]);
     } catch (error) {
-      Alert.alert('Erro', 'Email já cadastrado ou erro no cadastro');
+      Alert.alert('Erro', error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -41,6 +42,7 @@ const RegisterScreen = ({ navigation }) => {
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
+        autoCapitalize="none"
       />
       <TextInput
         style={styles.input}
@@ -49,7 +51,11 @@ const RegisterScreen = ({ navigation }) => {
         onChangeText={setPassword}
         secureTextEntry
       />
-      <Button title="Cadastrar" onPress={handleRegister} />
+      <Button 
+        title={loading ? "Cadastrando..." : "Cadastrar"} 
+        onPress={handleRegister} 
+        disabled={loading}
+      />
     </View>
   );
 };
@@ -59,18 +65,35 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     padding: 20,
+    backgroundColor: '#f5f5f5',
   },
   title: {
     fontSize: 24,
     marginBottom: 20,
     textAlign: 'center',
+    fontWeight: 'bold',
+    color: '#333',
   },
   input: {
-    height: 40,
-    borderColor: 'gray',
+    height: 50,
+    borderColor: '#ccc',
     borderWidth: 1,
-    marginBottom: 10,
-    paddingHorizontal: 10,
+    marginBottom: 15,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+  },
+  button: {
+    backgroundColor: '#FF6B6B',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  buttonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
 
