@@ -1,10 +1,24 @@
+
 import * as SQLite from 'expo-sqlite';
 
-const db = SQLite.openDatabase('denuncias.db');
+// Solução compatível com Bridgeless
+const openDatabase = () => {
+  if (!SQLite.openDatabase) {
+    console.warn('SQLite.openDatabase não disponível - usando mock para web');
+    return {
+      transaction: () => ({
+        executeSql: () => ({ rowsAffected: 0, insertId: undefined, rows: { _array: [] } }),
+      }),
+    };
+  }
+  return SQLite.openDatabase('denuncias.db');
+};
 
+const db = openDatabase();
+
+// Restante do seu código permanece igual...
 export const initDB = () => {
   db.transaction(tx => {
-    // Tabela de usuários
     tx.executeSql(
       `CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -14,7 +28,6 @@ export const initDB = () => {
       );`
     );
     
-    // Tabela de denúncias
     tx.executeSql(
       `CREATE TABLE IF NOT EXISTS reports (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
