@@ -139,6 +139,51 @@ app.get('/api/reports/:id', async (req, res) => {
   }
 });
 
+// Rota única para todas as denúncias com filtros
+app.get('/api/reports', async (req, res) => {
+  try {
+    const { userId, filter } = req.query;
+    
+    let query = `
+      SELECT r.*, u.name as user_name 
+      FROM reports r
+      LEFT JOIN users u ON r.user_id = u.id
+    `;
+    
+    const params = [];
+    let paramCount = 0;
+
+    // Se tiver userId, filtra por usuário
+    if (userId && !isNaN(userId)) {
+      query += ` WHERE r.user_id = $${++paramCount}`;
+      params.push(parseInt(userId));
+    } 
+    // Se não tiver userId, aplica filtros públicos
+    else if (filter === 'anonymous') {
+      query += ' WHERE r.is_anonymous = true';
+    } else if (filter === 'identified') {
+      query += ' WHERE r.is_anonymous = false';
+    }
+    
+    query += ' ORDER BY r.created_at DESC';
+    
+    const reports = await pool.query(query, params);
+    res.json({ reports: reports.rows });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erro ao buscar denúncias' });
+  }
+});
+
+
+
+
+
+
+
+
+
+
 // Inicia o servidor
 app.listen(port, () => {
   console.log(`Servidor rodando na porta ${port}`);

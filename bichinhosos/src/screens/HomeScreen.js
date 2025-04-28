@@ -20,33 +20,38 @@ const HomeScreen = ({ navigation, route }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterModalVisible, setFilterModalVisible] = useState(false);
-  const [filter, setFilter] = useState('all');
+  const [activeTab, setActiveTab] = useState('all'); // 'all' ou 'my'
+  const [filter, setFilter] = useState('all'); // 'all', 'anonymous', 'identified'
   const userId = route.params?.userId;
 
   useEffect(() => {
     loadReports();
-  }, [filter]);
+  }, [activeTab, filter]);
 
   const loadReports = async () => {
     try {
       setLoading(true);
-      let reports = await reportService.getReports(userId);
       
-      if (filter === 'anonymous') {
-        reports = reports.filter(r => r.is_anonymous === true);
-      } else if (filter === 'mine' && userId) {
-        reports = reports.filter(r => r.user_id === userId);
+      let params = {};
+      
+      if (activeTab === 'my') {
+        params.userId = userId;
+      } else {
+        params.filter = filter;
       }
       
-      setReports(reports);
+      const reportsData = await reportService.getReports(params);
+      setReports(reportsData);
+      
     } catch (error) {
       console.error('Erro ao carregar denúncias:', error);
-      Alert.alert('Erro', 'Falha ao carregar denúncias');
+      Alert.alert('Erro', error.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
+
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -89,6 +94,9 @@ const HomeScreen = ({ navigation, route }) => {
         ) : (
           <Text style={styles.userBadge}>Identificada</Text>
         )}
+        {activeTab === 'all' && !item.is_anonymous && item.user_name && (
+          <Text style={styles.authorText}>Por: {item.user_name}</Text>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -102,6 +110,23 @@ const HomeScreen = ({ navigation, route }) => {
         </TouchableOpacity>
       </View>
 
+      {/* Abas */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'all' && styles.activeTab]}
+          onPress={() => setActiveTab('all')}
+        >
+          <Text style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>Todas</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'my' && styles.activeTab]}
+          onPress={() => setActiveTab('my')}
+        >
+          <Text style={[styles.tabText, activeTab === 'my' && styles.activeTabText]}>Minhas</Text>
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
@@ -112,7 +137,7 @@ const HomeScreen = ({ navigation, route }) => {
         <MaterialIcons name="search" size={24} color="#666" style={styles.searchIcon} />
       </View>
 
-      {loading && reports.length === 0 ? (
+      {loading && filteredReports.length === 0 ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#FF6B6B" />
         </View>
@@ -131,7 +156,11 @@ const HomeScreen = ({ navigation, route }) => {
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>Nenhuma denúncia encontrada</Text>
+              <Text style={styles.emptyText}>
+                {activeTab === 'all' 
+                  ? 'Nenhuma denúncia encontrada' 
+                  : 'Você ainda não fez nenhuma denúncia'}
+              </Text>
             </View>
           }
         />
@@ -144,6 +173,7 @@ const HomeScreen = ({ navigation, route }) => {
         <MaterialIcons name="add" size={30} color="#fff" />
       </TouchableOpacity>
 
+      {/* Modal de Filtros */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -174,17 +204,15 @@ const HomeScreen = ({ navigation, route }) => {
               <Text style={styles.filterOptionText}>Denúncias anônimas</Text>
             </TouchableOpacity>
             
-            {userId && (
-              <TouchableOpacity
-                style={[styles.filterOption, filter === 'mine' && styles.filterOptionSelected]}
-                onPress={() => {
-                  setFilter('mine');
-                  setFilterModalVisible(false);
-                }}
-              >
-                <Text style={styles.filterOptionText}>Minhas denúncias</Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity
+              style={[styles.filterOption, filter === 'identified' && styles.filterOptionSelected]}
+              onPress={() => {
+                setFilter('identified');
+                setFilterModalVisible(false);
+              }}
+            >
+              <Text style={styles.filterOptionText}>Denúncias identificadas</Text>
+            </TouchableOpacity>
             
             <TouchableOpacity
               style={styles.closeButton}
@@ -216,6 +244,30 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    marginHorizontal: 15,
+    marginTop: 10,
+    borderRadius: 8,
+    overflow: 'hidden',
+    elevation: 2,
+  },
+  tabButton: {
+    flex: 1,
+    padding: 12,
+    alignItems: 'center',
+  },
+  activeTab: {
+    backgroundColor: '#FF6B6B',
+  },
+  tabText: {
+    color: '#666',
+    fontWeight: 'bold',
+  },
+  activeTabText: {
+    color: '#fff',
   },
   searchContainer: {
     backgroundColor: '#fff',
@@ -284,7 +336,8 @@ const styles = StyleSheet.create({
   },
   reportFooter: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   anonymousBadge: {
     backgroundColor: '#f0f0f0',
@@ -301,6 +354,11 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 10,
     fontSize: 12,
+  },
+  authorText: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
   },
   addButton: {
     position: 'absolute',
@@ -329,15 +387,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 50,
   },
-  emptyImage: {
-    width: 150,
-    height: 150,
-    opacity: 0.5,
-    marginBottom: 20,
-  },
   emptyText: {
     color: '#888',
     fontSize: 16,
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
   modalContainer: {
     flex: 1,
@@ -379,6 +433,38 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
+
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    marginHorizontal: 15,
+    marginTop: 10,
+    borderRadius: 8,
+    overflow: 'hidden',
+    elevation: 2,
+  },
+  tabButton: {
+    flex: 1,
+    padding: 12,
+    alignItems: 'center',
+  },
+  activeTab: {
+    backgroundColor: '#FF6B6B',
+  },
+  tabText: {
+    color: '#666',
+    fontWeight: 'bold',
+  },
+  activeTabText: {
+    color: '#fff',
+  },
+  authorText: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+
+
 });
 
 export default HomeScreen;
