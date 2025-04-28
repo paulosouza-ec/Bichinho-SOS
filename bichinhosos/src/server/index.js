@@ -1,0 +1,145 @@
+require('dotenv').config();
+const express = require('express');
+const { Pool } = require('pg');
+const bodyParser = require('body-parser');
+const cors = require('cors');
+
+const app = express();
+const port = process.env.PORT || 3000;
+
+// Configuração do PostgreSQL
+const pool = new Pool({
+  user: process.env.DB_USER,
+  host: process.env.DB_HOST,
+  database: 'bichinhosos',
+  password: process.env.DB_PASSWORD,
+  port: process.env.DB_PORT || 5432,
+});
+
+// Middlewares
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+app.use(bodyParser.json());
+
+// Rotas de autenticação
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+    
+    // Verifica se o usuário já existe
+    const userExists = await pool.query(
+      'SELECT * FROM users WHERE email = $1', 
+      [email]
+    );
+    
+    if (userExists.rows.length > 0) {
+      return res.status(400).json({ message: 'Email já cadastrado' });
+    }
+    
+    // Cria o novo usuário
+    const newUser = await pool.query(
+      'INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING *',
+      [name, email, password]
+    );
+    
+    res.json({ user: newUser.rows[0] });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erro ao registrar usuário' });
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    const user = await pool.query(
+      'SELECT * FROM users WHERE email = $1 AND password = $2',
+      [email, password]
+    );
+    
+    if (user.rows.length === 0) {
+      return res.status(401).json({ message: 'Credenciais inválidas' });
+    }
+    
+    res.json({ user: user.rows[0] });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erro ao fazer login' });
+  }
+});
+
+// Rotas de denúncias
+app.post('/api/reports', async (req, res) => {
+  try {
+    const { userId, title, description, location, isAnonymous, photoUri } = req.body;
+    
+    const newReport = await pool.query(
+      `INSERT INTO reports (
+        user_id, title, description, location, 
+        is_anonymous, photo_uri
+      ) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [
+        isAnonymous ? null : userId,
+        title,
+        description,
+        location || null,
+        isAnonymous,
+        photoUri || null
+      ]
+    );
+    
+    res.json({ report: newReport.rows[0] });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erro ao criar denúncia' });
+  }
+});
+
+app.get('/api/reports', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    let query = 'SELECT * FROM reports';
+    let params = [];
+    
+    if (userId) {
+      query += ' WHERE user_id = $1 OR is_anonymous = true';
+      params.push(userId);
+    }
+    
+    query += ' ORDER BY date DESC';
+    
+    const reports = await pool.query(query, params);
+    res.json({ reports: reports.rows });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erro ao buscar denúncias' });
+  }
+});
+
+app.get('/api/reports/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const report = await pool.query(
+      'SELECT * FROM reports WHERE id = $1',
+      [id]
+    );
+    
+    if (report.rows.length === 0) {
+      return res.status(404).json({ message: 'Denúncia não encontrada' });
+    }
+    
+    res.json({ report: report.rows[0] });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erro ao buscar denúncia' });
+  }
+});
+
+// Inicia o servidor
+app.listen(port, () => {
+  console.log(`Servidor rodando na porta ${port}`);
+});

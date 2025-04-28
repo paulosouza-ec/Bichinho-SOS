@@ -6,17 +6,35 @@ const RegisterScreen = ({ navigation }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !phone) {
       Alert.alert('Erro', 'Preencha todos os campos');
+      return;
+    }
+
+    // Validação básica de telefone (pode ajustar conforme necessidade)
+    if (phone.length < 11) {
+      Alert.alert('Erro', 'Telefone deve ter pelo menos 11 dígitos');
+      return;
+    }
+
+    // Validação básica de email
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      Alert.alert('Erro', 'Email inválido');
       return;
     }
 
     setLoading(true);
     try {
-      await authService.registerUser({ name, email, password });
+      await authService.registerUser({ 
+        name, 
+        email, 
+        password,
+        phone 
+      });
       Alert.alert('Sucesso', 'Cadastro realizado!', [
         { text: 'OK', onPress: () => navigation.navigate('Login') }
       ]);
@@ -32,13 +50,13 @@ const RegisterScreen = ({ navigation }) => {
       <Text style={styles.title}>Cadastro</Text>
       <TextInput
         style={styles.input}
-        placeholder="Nome"
+        placeholder="Nome completo*"
         value={name}
         onChangeText={setName}
       />
       <TextInput
         style={styles.input}
-        placeholder="Email"
+        placeholder="Email*"
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
@@ -46,16 +64,35 @@ const RegisterScreen = ({ navigation }) => {
       />
       <TextInput
         style={styles.input}
-        placeholder="Senha"
+        placeholder="Senha*"
         value={password}
         onChangeText={setPassword}
         secureTextEntry
       />
-      <Button 
-        title={loading ? "Cadastrando..." : "Cadastrar"} 
-        onPress={handleRegister} 
-        disabled={loading}
+      <TextInput
+        style={styles.input}
+        placeholder="Telefone* (com DDD)"
+        value={phone}
+        onChangeText={setPhone}
+        keyboardType="phone-pad"
+        maxLength={15} // Espaço para DDD + número + possíveis caracteres especiais
       />
+      <View style={styles.buttonContainer}>
+        <Button 
+          title={loading ? "Cadastrando..." : "Cadastrar"} 
+          onPress={handleRegister} 
+          disabled={loading}
+          color="#FF6B6B"
+        />
+      </View>
+      <View style={styles.loginContainer}>
+        <Text style={styles.loginText}>Já tem uma conta?</Text>
+        <Button
+          title="Faça login"
+          onPress={() => navigation.navigate('Login')}
+          color="#4CAF50"
+        />
+      </View>
     </View>
   );
 };
@@ -83,17 +120,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#fff',
   },
-  button: {
-    backgroundColor: '#FF6B6B',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
+  buttonContainer: {
     marginTop: 10,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
-  buttonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
+  loginContainer: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  loginText: {
+    marginBottom: 10,
+    color: '#666',
   },
 });
 

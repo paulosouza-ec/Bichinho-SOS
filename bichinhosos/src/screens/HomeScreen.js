@@ -2,17 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
-  Button, 
   FlatList, 
   StyleSheet, 
   TouchableOpacity, 
-  Image,
   RefreshControl,
   ActivityIndicator,
   Modal,
-  TextInput
+  TextInput,
+  Alert
 } from 'react-native';
-import { executeSql } from '../services/database';
+import { reportService } from '../services/database';
 import { MaterialIcons } from '@expo/vector-icons';
 
 const HomeScreen = ({ navigation, route }) => {
@@ -21,7 +20,7 @@ const HomeScreen = ({ navigation, route }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterModalVisible, setFilterModalVisible] = useState(false);
-  const [filter, setFilter] = useState('all'); // 'all', 'anonymous', 'mine'
+  const [filter, setFilter] = useState('all');
   const userId = route.params?.userId;
 
   useEffect(() => {
@@ -31,24 +30,18 @@ const HomeScreen = ({ navigation, route }) => {
   const loadReports = async () => {
     try {
       setLoading(true);
-      let query = 'SELECT * FROM reports';
-      let params = [];
-
-      // Aplicar filtros
-      if (filter === 'mine' && userId) {
-        query += ' WHERE userId = ?';
-        params.push(userId);
-      } else if (filter === 'anonymous') {
-        query += ' WHERE isAnonymous = 1';
+      let reports = await reportService.getReports(userId);
+      
+      if (filter === 'anonymous') {
+        reports = reports.filter(r => r.is_anonymous === true);
+      } else if (filter === 'mine' && userId) {
+        reports = reports.filter(r => r.user_id === userId);
       }
-
-      query += ' ORDER BY date DESC';
-
-      const result = await executeSql(query, params);
-      setReports(result.rows._array);
+      
+      setReports(reports);
     } catch (error) {
       console.error('Erro ao carregar denúncias:', error);
-      alert('Erro ao carregar denúncias');
+      Alert.alert('Erro', 'Falha ao carregar denúncias');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -70,12 +63,12 @@ const HomeScreen = ({ navigation, route }) => {
   const renderReport = ({ item }) => (
     <TouchableOpacity 
       style={styles.reportItem}
-      onPress={() => navigation.navigate('Report', { report: item, userId })}
+      onPress={() => navigation.navigate('ReportDetail', { report: item, userId })}
     >
       <View style={styles.reportHeader}>
         <Text style={styles.reportTitle}>{item.title}</Text>
         <Text style={styles.reportDate}>
-          {new Date(item.date).toLocaleDateString('pt-BR')}
+          {new Date(item.created_at).toLocaleDateString('pt-BR')}
         </Text>
       </View>
       
@@ -91,7 +84,7 @@ const HomeScreen = ({ navigation, route }) => {
       )}
       
       <View style={styles.reportFooter}>
-        {item.isAnonymous ? (
+        {item.is_anonymous ? (
           <Text style={styles.anonymousBadge}>Anônima</Text>
         ) : (
           <Text style={styles.userBadge}>Identificada</Text>
@@ -138,10 +131,6 @@ const HomeScreen = ({ navigation, route }) => {
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Image 
-                source={require('../../assets/empty.png')} 
-                style={styles.emptyImage}
-              />
               <Text style={styles.emptyText}>Nenhuma denúncia encontrada</Text>
             </View>
           }
@@ -155,7 +144,6 @@ const HomeScreen = ({ navigation, route }) => {
         <MaterialIcons name="add" size={30} color="#fff" />
       </TouchableOpacity>
 
-      {/* Modal de Filtros */}
       <Modal
         animationType="slide"
         transparent={true}

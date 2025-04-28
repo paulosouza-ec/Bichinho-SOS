@@ -8,7 +8,8 @@ import {
   Switch, 
   TouchableOpacity, 
   Image,
-  ScrollView
+  ScrollView,
+  ActivityIndicator
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -42,39 +43,35 @@ const ReportScreen = ({ navigation, route }) => {
     }
   };
 
-  const removeImage = () => {
-    setPhotoUri(null);
-  };
-
   const submitReport = async () => {
     if (!title.trim()) {
-      Alert.alert('Atenção', 'Por favor, informe um título para a denúncia');
+      Alert.alert('Atenção', 'Informe um título para a denúncia');
       return;
     }
-
+  
     if (!description.trim() || description.length < 10) {
-      Alert.alert('Atenção', 'A descrição deve ter pelo menos 10 caracteres');
+      Alert.alert('Atenção', 'Descrição precisa ter pelo menos 10 caracteres');
       return;
     }
-
+  
     setLoading(true);
     try {
-      await reportService.createReport({
+      const report = {
         userId: isAnonymous ? null : userId,
         title: title.trim(),
         description: description.trim(),
-        location: location.trim(),
+        location: location.trim() || null,
         isAnonymous,
-        photoUri,
-        date: new Date().toISOString()
-      });
-      
-      Alert.alert('Sucesso', 'Denúncia registrada com sucesso!', [
+        photoUri: photoUri || null
+      };
+  
+      await reportService.createReport(report);
+      Alert.alert('Sucesso', 'Denúncia registrada!', [
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
     } catch (error) {
       console.error('Erro ao criar denúncia:', error);
-      Alert.alert('Erro', 'Não foi possível registrar a denúncia. Tente novamente.');
+      Alert.alert('Erro', error.message || 'Falha ao registrar denúncia. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -100,9 +97,6 @@ const ReportScreen = ({ navigation, route }) => {
         multiline
         maxLength={500}
       />
-      <Text style={styles.characterCount}>
-        {description.length}/500 caracteres
-      </Text>
       
       <TextInput
         style={styles.input}
@@ -136,12 +130,6 @@ const ReportScreen = ({ navigation, route }) => {
             source={{ uri: photoUri }} 
             style={styles.imagePreview} 
           />
-          <TouchableOpacity 
-            style={styles.imageRemoveButton}
-            onPress={removeImage}
-          >
-            <MaterialIcons name="close" size={20} color="#fff" />
-          </TouchableOpacity>
         </View>
       )}
       
@@ -159,6 +147,7 @@ const ReportScreen = ({ navigation, route }) => {
     </ScrollView>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {
