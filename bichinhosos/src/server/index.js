@@ -177,10 +177,124 @@ app.get('/api/reports', async (req, res) => {
 
 
 
+// Rota para curtir/descurtir uma denúncia
+app.post('/api/reports/:id/like', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId } = req.body;
 
+    // Verifica se o usuário já curtiu esta denúncia
+    const existingLike = await pool.query(
+      'SELECT * FROM likes WHERE report_id = $1 AND user_id = $2',
+      [id, userId]
+    );
 
+    if (existingLike.rows.length > 0) {
+      // Remove o like
+      await pool.query(
+        'DELETE FROM likes WHERE id = $1',
+        [existingLike.rows[0].id]
+      );
+      res.json({ liked: false });
+    } else {
+      // Adiciona o like
+      await pool.query(
+        'INSERT INTO likes (report_id, user_id) VALUES ($1, $2)',
+        [id, userId]
+      );
+      res.json({ liked: true });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erro ao processar like' });
+  }
+});
 
+// Rota para adicionar comentário
+app.post('/api/reports/:id/comments', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId, content, parentId } = req.body;
 
+    const newComment = await pool.query(
+      `INSERT INTO comments (report_id, user_id, content, parent_id)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [id, userId, content, parentId || null]
+    );
+
+    // Busca os dados do usuário para retornar com o comentário
+    const user = await pool.query(
+      'SELECT id, name FROM users WHERE id = $1',
+      [userId]
+    );
+
+    res.json({ 
+      comment: {
+        ...newComment.rows[0],
+        user: user.rows[0]
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erro ao adicionar comentário' });
+  }
+});
+
+// Rota para buscar comentários de uma denúncia
+app.get('/api/reports/:id/comments', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const comments = await pool.query(
+      `SELECT c.*, u.name as user_name 
+       FROM comments c
+       JOIN users u ON c.user_id = u.id
+       WHERE c.report_id = $1
+       ORDER BY c.created_at DESC`,
+      [id]
+    );
+
+    res.json({ comments: comments.rows });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erro ao buscar comentários' });
+  }
+});
+
+// Rota para verificar se usuário curtiu uma denúncia
+app.get('/api/reports/:id/likes/check', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId } = req.query;
+
+    const like = await pool.query(
+      'SELECT * FROM likes WHERE report_id = $1 AND user_id = $2',
+      [id, userId]
+    );
+
+    res.json({ liked: like.rows.length > 0 });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erro ao verificar like' });
+  }
+});
+
+// Rota para contar likes de uma denúncia
+app.get('/api/reports/:id/likes/count', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const count = await pool.query(
+      'SELECT COUNT(*) FROM likes WHERE report_id = $1',
+      [id]
+    );
+
+    res.json({ count: parseInt(count.rows[0].count) });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erro ao contar likes' });
+  }
+});
 
 
 

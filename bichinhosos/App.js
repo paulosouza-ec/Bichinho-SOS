@@ -6,6 +6,7 @@ import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import ReportScreen from './src/screens/ReportScreen';
+import ReportDetailScreen from './src/screens/ReportDetailScreen';
 
 const Stack = createStackNavigator();
 
@@ -33,6 +34,15 @@ export default function App() {
           component={ReportScreen} 
           options={{ title: 'Nova Denúncia' }}
         />
+
+        <Stack.Screen 
+          name="ReportDetail" 
+          component={ReportDetailScreen}
+          options={{headerShown: false}}
+        />
+
+
+
       </Stack.Navigator>
     </NavigationContainer>
   );
