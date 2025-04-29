@@ -25,29 +25,48 @@ app.use(cors({
 app.use(bodyParser.json());
 
 // Rotas de autenticação
-app.post('/api/auth/register', async (req, res) => {
+app.post('/auth/register', async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, phone, nickname, profile_pic } = req.body;
     
-    // Verifica se o usuário já existe
-    const userExists = await pool.query(
-      'SELECT * FROM users WHERE email = $1', 
+    // Verificação final do nickname
+    const nicknameCheck = await pool.query(
+      'SELECT id FROM users WHERE nickname ILIKE $1',
+      [nickname]
+    );
+    
+    if (nicknameCheck.rows.length > 0) {
+      return res.status(400).json({ message: 'Nickname já em uso' });
+    }
+
+    // Verificação de email
+    const emailCheck = await pool.query(
+      'SELECT id FROM users WHERE email = $1',
       [email]
     );
     
-    if (userExists.rows.length > 0) {
+    if (emailCheck.rows.length > 0) {
       return res.status(400).json({ message: 'Email já cadastrado' });
     }
-    
-    // Cria o novo usuário
+
+    // Inserção no banco
     const newUser = await pool.query(
-      'INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING *',
-      [name, email, password]
+      `INSERT INTO users (name, email, password, phone, nickname, profile_pic) 
+       VALUES ($1, $2, $3, $4, $5, $6) 
+       RETURNING id, name, email, nickname, profile_pic`,
+      [
+        name, 
+        email, 
+        password, 
+        phone, 
+        nickname, 
+        profile_pic || null
+      ]
     );
     
     res.json({ user: newUser.rows[0] });
   } catch (error) {
-    console.error(error);
+    console.error('Erro no registro:', error);
     res.status(500).json({ message: 'Erro ao registrar usuário' });
   }
 });
@@ -65,9 +84,14 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ message: 'Credenciais inválidas' });
     }
     
-    res.json({ user: user.rows[0] });
+    const userData = user.rows[0];
+    
+    // Garante que sempre haverá uma imagem (padrão ou customizada)
+  
+    userData.profile_pic = userData.profile_pic || 'https://cdn-icons-png.flaticon.com/512/1946/1946429.png';
+    
+    res.json({ user: userData });
   } catch (error) {
-    console.error(error);
     res.status(500).json({ message: 'Erro ao fazer login' });
   }
 });
@@ -295,6 +319,33 @@ app.get('/api/reports/:id/likes/count', async (req, res) => {
     res.status(500).json({ message: 'Erro ao contar likes' });
   }
 });
+
+
+//Procurar nick do usuario
+
+app.post('/auth/check-nickname', async (req, res) => {
+  try {
+    const { nickname } = req.body;
+    
+    if (!nickname || nickname.length < 3) {
+      return res.json({ available: false, message: 'Nickname muito curto' });
+    }
+
+    const result = await pool.query(
+      'SELECT id FROM users WHERE nickname ILIKE $1', 
+      [nickname]
+    );
+    
+    res.json({ 
+      available: result.rows.length === 0,
+      valid: nickname.length >= 3
+    });
+  } catch (error) {
+    console.error('Erro ao verificar nickname:', error);
+    res.status(500).json({ message: 'Erro no servidor' });
+  }
+});
+
 
 
 

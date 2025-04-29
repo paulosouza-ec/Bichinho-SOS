@@ -3,10 +3,14 @@ import api from './api';
 export const authService = {
   registerUser: async (userData) => {
     try {
-      const response = await api.post('/auth/register', userData);
+      const response = await api.post('/auth/register', {
+        ...userData,
+        profile_pic: userData.profile_pic || null
+      });
       return response.data.user;
     } catch (error) {
-      throw new Error(error.message || 'Erro ao registrar usuário');
+      console.error('Erro detalhado no registro:', error.response?.data || error.message);
+      throw new Error(error.response?.data?.message || 'Erro ao registrar usuário');
     }
   },
 
@@ -18,6 +22,27 @@ export const authService = {
       throw new Error(error.message || 'Credenciais inválidas');
     }
   },
+
+  async checkNickname(nickname) {
+    try {
+      const response = await api.post('/auth/check-nickname', { nickname });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao verificar nickname:', error);
+      throw new Error(error.response?.data?.message || 'Erro ao verificar nickname');
+    }
+  },
+
+  async registerUser(userData) {
+    try {
+      const response = await api.post('/auth/register', userData);
+      return response.data.user;
+    } catch (error) {
+      console.error('Erro no registro:', error.response?.data || error.message);
+      throw new Error(error.response?.data?.message || 'Erro ao registrar usuário');
+    }
+  },
+
 };
 
 export const reportService = {
