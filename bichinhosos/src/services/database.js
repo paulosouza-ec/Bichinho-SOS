@@ -3,38 +3,6 @@ import api from './api';
 export const authService = {
   registerUser: async (userData) => {
     try {
-      const response = await api.post('/auth/register', {
-        ...userData,
-        profile_pic: userData.profile_pic || null
-      });
-      return response.data.user;
-    } catch (error) {
-      console.error('Erro detalhado no registro:', error.response?.data || error.message);
-      throw new Error(error.response?.data?.message || 'Erro ao registrar usuário');
-    }
-  },
-
-  loginUser: async (email, password) => {
-    try {
-      const response = await api.post('/auth/login', { email, password });
-      return response.data.user;
-    } catch (error) {
-      throw new Error(error.message || 'Credenciais inválidas');
-    }
-  },
-
-  async checkNickname(nickname) {
-    try {
-      const response = await api.post('/auth/check-nickname', { nickname });
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao verificar nickname:', error);
-      throw new Error(error.response?.data?.message || 'Erro ao verificar nickname');
-    }
-  },
-
-  async registerUser(userData) {
-    try {
       const response = await api.post('/auth/register', userData);
       return response.data.user;
     } catch (error) {
@@ -43,12 +11,34 @@ export const authService = {
     }
   },
 
+
+  loginUser: async (email, password) => {
+    try {
+      const response = await api.post('/auth/login', { email, password });
+      return response.data.user;
+    } catch (error) {
+      console.error('Erro no login:', error.response?.data || error.message);
+      throw new Error(error.response?.data?.message || 'Credenciais inválidas');
+    }
+  },
+
+  checkNickname: async (nickname) => {
+    try {
+      const response = await api.post('/auth/check-nickname', { nickname });
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao verificar nickname:', error.response?.data || error.message);
+      throw new Error(error.response?.data?.message || 'Erro ao verificar nickname');
+    }
+  },
+
+
 };
 
 export const reportService = {
   createReport: async (reportData) => {
     try {
-      const response = await api.post('/reports', reportData);
+      const response = await api.post('/api/reports', reportData); // Corrigido para /api/reports
       return response.data.report;
     } catch (error) {
       throw new Error(error.message || 'Erro ao criar denúncia');
@@ -61,7 +51,7 @@ export const reportService = {
       if (userId) params.userId = userId;
       if (filter) params.filter = filter;
       
-      const response = await api.get('/reports', { params });
+      const response = await api.get('api/reports', { params });
       return response.data.reports;
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Erro ao buscar denúncias');
@@ -70,7 +60,7 @@ export const reportService = {
 
   getReportById: async (id) => {
     try {
-      const response = await api.get(`/reports/${id}`);
+      const response = await api.get(`api/reports/${id}`);
       return response.data.report;
     } catch (error) {
       throw new Error(error.message || 'Erro ao buscar denúncia');
@@ -79,7 +69,7 @@ export const reportService = {
 
   likeReport: async (reportId, userId) => {
     try {
-      const response = await api.post(`/reports/${reportId}/like`, { userId });
+      const response = await api.post(`/api/reports/${reportId}/like`, { userId });
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Erro ao curtir denúncia');
@@ -88,7 +78,7 @@ export const reportService = {
   
   addComment: async (reportId, userId, content, parentId) => {
     try {
-      const response = await api.post(`/reports/${reportId}/comments`, {
+      const response = await api.post(`/api/reports/${reportId}/comments`, {
         userId,
         content,
         parentId
@@ -101,7 +91,7 @@ export const reportService = {
   
   getComments: async (reportId) => {
     try {
-      const response = await api.get(`/reports/${reportId}/comments`);
+      const response = await api.get(`/api/reports/${reportId}/comments`);
       return response.data.comments;
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Erro ao buscar comentários');
@@ -110,7 +100,7 @@ export const reportService = {
   
   checkUserLike: async (reportId, userId) => {
     try {
-      const response = await api.get(`/reports/${reportId}/likes/check`, {
+      const response = await api.get(`/api/reports/${reportId}/likes/check`, {
         params: { userId }
       });
       return response.data.liked;
@@ -121,7 +111,7 @@ export const reportService = {
   
   getLikesCount: async (reportId) => {
     try {
-      const response = await api.get(`/reports/${reportId}/likes/count`);
+      const response = await api.get(`/api/reports/${reportId}/likes/count`);
       return response.data.count;
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Erro ao contar likes');

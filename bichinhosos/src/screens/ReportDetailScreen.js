@@ -15,6 +15,7 @@ import { MaterialIcons, FontAwesome, Ionicons } from '@expo/vector-icons';
 import { reportService } from '../services/database';
 import moment from 'moment'; 
 
+
 const ReportDetailScreen = ({ route, navigation }) => {
   const { report, userId } = route.params;
   const [comments, setComments] = useState([]);

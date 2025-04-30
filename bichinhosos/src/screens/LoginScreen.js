@@ -12,13 +12,17 @@ const LoginScreen = ({ navigation }) => {
       Alert.alert('Erro', 'Preencha todos os campos');
       return;
     }
-
+  
     setLoading(true);
     try {
       const user = await authService.loginUser(email, password);
-      navigation.navigate('Home', { userId: user.id });
+      if (user) {
+        navigation.navigate('Home', { userId: user.id });
+      } else {
+        Alert.alert('Erro', 'Credenciais inválidas');
+      }
     } catch (error) {
-      Alert.alert('Erro', error.message);
+      Alert.alert('Erro', error.message || 'Falha ao fazer login');
     } finally {
       setLoading(false);
     }

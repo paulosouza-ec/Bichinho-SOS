@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Configuração base da API
 const api = axios.create({
-  baseURL: 'http://192.168.100.88:3000/api', // Substitua pelo endereço do seu servidor
+  baseURL: 'http://192.168.0.12:3000',
 });
 
 // Interceptor para tratamento de erros

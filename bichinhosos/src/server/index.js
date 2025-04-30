@@ -65,13 +65,14 @@ app.post('/auth/register', async (req, res) => {
     );
     
     res.json({ user: newUser.rows[0] });
+    
   } catch (error) {
     console.error('Erro no registro:', error);
     res.status(500).json({ message: 'Erro ao registrar usuário' });
   }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     
@@ -85,13 +86,11 @@ app.post('/api/auth/login', async (req, res) => {
     }
     
     const userData = user.rows[0];
-    
-    // Garante que sempre haverá uma imagem (padrão ou customizada)
-  
     userData.profile_pic = userData.profile_pic || 'https://cdn-icons-png.flaticon.com/512/1946/1946429.png';
     
     res.json({ user: userData });
   } catch (error) {
+    console.error('Erro no login:', error);
     res.status(500).json({ message: 'Erro ao fazer login' });
   }
 });
@@ -99,8 +98,13 @@ app.post('/api/auth/login', async (req, res) => {
 // Rotas de denúncias
 app.post('/api/reports', async (req, res) => {
   try {
-    const { userId, title, description, location, isAnonymous, photoUri } = req.body;
+    const { userId, title, description, location, isAnonymous } = req.body;
     
+    // Validações básicas
+    if (!title || !description) {
+      return res.status(400).json({ message: 'Título e descrição são obrigatórios' });
+    }
+
     const newReport = await pool.query(
       `INSERT INTO reports (
         user_id, title, description, location, 
@@ -112,7 +116,7 @@ app.post('/api/reports', async (req, res) => {
         description,
         location || null,
         isAnonymous,
-        photoUri || null
+        req.body.photo || null
       ]
     );
     
@@ -123,26 +127,7 @@ app.post('/api/reports', async (req, res) => {
   }
 });
 
-app.get('/api/reports', async (req, res) => {
-  try {
-    const { userId } = req.query;
-    let query = 'SELECT * FROM reports';
-    let params = [];
-    
-    if (userId) {
-      query += ' WHERE user_id = $1 OR is_anonymous = true';
-      params.push(userId);
-    }
-    
-    query += ' ORDER BY date DESC';
-    
-    const reports = await pool.query(query, params);
-    res.json({ reports: reports.rows });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Erro ao buscar denúncias' });
-  }
-});
+
 
 app.get('/api/reports/:id', async (req, res) => {
   try {
@@ -326,6 +311,7 @@ app.get('/api/reports/:id/likes/count', async (req, res) => {
 app.post('/auth/check-nickname', async (req, res) => {
   try {
     const { nickname } = req.body;
+    console.log('Verificando nickname:', nickname); // Log para depuração
     
     if (!nickname || nickname.length < 3) {
       return res.json({ available: false, message: 'Nickname muito curto' });

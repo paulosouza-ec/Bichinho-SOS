@@ -45,9 +45,8 @@ const RegisterScreen = ({ navigation }) => {
       Alert.alert('Erro', 'Não foi possível selecionar a imagem');
     }
   };
-  
+
   const handleRegister = async () => {
-    // Validações básicas
     if (!name || !email || !password || !phone || !nickname) {
       Alert.alert('Erro', 'Preencha todos os campos obrigatórios');
       return;
@@ -58,33 +57,18 @@ const RegisterScreen = ({ navigation }) => {
       return;
     }
   
-    if (password.length < 6) {
-      Alert.alert('Erro', 'A senha deve ter pelo menos 6 caracteres');
-      return;
-    }
-  
-    if (phone.length < 11) {
-      Alert.alert('Erro', 'Telefone deve ter 11 dígitos (com DDD)');
-      return;
-    }
-  
-    if (!/^\S+@\S+\.\S+$/.test(email)) {
-      Alert.alert('Erro', 'Email inválido');
-      return;
-    }
-  
     setLoading(true);
-    
     try {
-      // Verifica nickname
-      const nicknameCheck = await authService.checkNickname(nickname);
-      if (!nicknameCheck.available) {
-        Alert.alert('Erro', 'Nickname já está em uso');
+      // Verificação do nickname
+      const nicknameResponse = await authService.checkNickname(nickname);
+      if (!nicknameResponse.available) {
+        Alert.alert('Erro', 'Este nickname já está em uso');
+        setLoading(false);
         return;
       }
   
-      // Cadastra o usuário
-      await authService.registerUser({ 
+      // Cadastro do usuário
+      await authService.registerUser({
         name, 
         email, 
         password,
@@ -96,27 +80,14 @@ const RegisterScreen = ({ navigation }) => {
       Alert.alert('Sucesso', 'Cadastro realizado!', [
         { text: 'OK', onPress: () => navigation.navigate('Login') }
       ]);
+      
     } catch (error) {
       console.error('Erro no cadastro:', error);
-      let errorMessage = 'Falha ao cadastrar';
-      
-      if (error.message.includes('Email já cadastrado')) {
-        errorMessage = 'Este email já está cadastrado';
-      } else if (error.message.includes('Nickname já em uso')) {
-        errorMessage = 'Este nickname já está em uso';
-      }
-      
-      Alert.alert('Erro', errorMessage);
+      Alert.alert('Erro', error.message || 'Falha ao cadastrar usuário');
     } finally {
       setLoading(false);
     }
   };
-
-  
-
-
-
-  
 
   return (
     <View style={styles.container}>

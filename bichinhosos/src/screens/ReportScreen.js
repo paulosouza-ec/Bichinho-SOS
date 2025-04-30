@@ -15,6 +15,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { MaterialIcons } from '@expo/vector-icons';
 import { reportService } from '../services/database';
 
+
+
 const ReportScreen = ({ navigation, route }) => {
   const { userId } = route.params;
   const [title, setTitle] = useState('');
@@ -56,16 +58,19 @@ const ReportScreen = ({ navigation, route }) => {
   
     setLoading(true);
     try {
-      const report = {
+      // Criar objeto com os dados da denúncia
+      const reportData = {
         userId: isAnonymous ? null : userId,
         title: title.trim(),
         description: description.trim(),
         location: location.trim() || null,
         isAnonymous,
-        photoUri: photoUri || null
+        photo: photoUri
       };
   
-      await reportService.createReport(report);
+      // Usar o reportService para criar a denúncia
+      await reportService.createReport(reportData);
+  
       Alert.alert('Sucesso', 'Denúncia registrada!', [
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
@@ -76,7 +81,7 @@ const ReportScreen = ({ navigation, route }) => {
       setLoading(false);
     }
   };
-
+  
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Nova Denúncia</Text>
