@@ -118,6 +118,30 @@ export const reportService = {
     }
   },
 
+  editComment: async (reportId, commentId, userId, content) => {
+    try {
+      const response = await api.put(`/api/reports/${reportId}/comments/${commentId}`, {
+        content,
+        userId
+      });
+      return response.data.comment;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Erro ao editar comentário');
+    }
+  },
+  
+  deleteComment: async (reportId, commentId, userId) => {
+    try {
+      const response = await api.delete(`/api/reports/${reportId}/comments/${commentId}`, {
+        data: { userId }
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Erro ao excluir comentário');
+    }
+  },
+  
+
 
 };
 

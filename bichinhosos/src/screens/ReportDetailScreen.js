@@ -25,6 +25,9 @@ const ReportDetailScreen = ({ route, navigation }) => {
   const [likesCount, setLikesCount] = useState(0);
   const [replyingTo, setReplyingTo] = useState(null);
   const [commentLoading, setCommentLoading] = useState(false);
+  const [editingComment, setEditingComment] = useState(null);
+  const [editCommentText, setEditCommentText] = useState('');
+
 
   useEffect(() => {
     loadData();
@@ -90,7 +93,6 @@ const ReportDetailScreen = ({ route, navigation }) => {
       item.parent_id && styles.replyComment
     ]}>
       <View style={styles.commentHeader}>
-        {/* Adiciona a imagem do perfil */}
         <Image 
           source={{ uri: item.user_avatar || 'https://cdn-icons-png.flaticon.com/512/1946/1946429.png' }} 
           style={styles.userAvatar}
@@ -101,9 +103,63 @@ const ReportDetailScreen = ({ route, navigation }) => {
             {moment(item.created_at).fromNow()}
           </Text>
         </View>
+        
+        {/* Botões de editar/excluir (só aparece para o dono do comentário) */}
+        {item.user_id === userId && !editingComment && (
+          <View style={styles.commentActions}>
+            <TouchableOpacity onPress={() => {
+              setEditingComment(item.id);
+              setEditCommentText(item.content);
+            }}>
+              <Image
+                source={{ uri: 'https://cdn-icons-png.flaticon.com/512/1828/1828911.png' }}
+                style={styles.actionIcon}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => 
+              Alert.alert(
+                'Excluir comentário',
+                'Tem certeza que deseja excluir este comentário?',
+                [
+                  { text: 'Cancelar', style: 'cancel' },
+                  { text: 'Excluir', onPress: () => handleDeleteComment(item.id) }
+                ]
+              )
+            }>
+              <Image
+                source={{ uri: 'https://cdn-icons-png.flaticon.com/512/484/484662.png' }}
+                style={styles.actionIcon}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
       
-      <Text style={styles.commentText}>{item.content}</Text>
+      {editingComment === item.id ? (
+        <View style={styles.editContainer}>
+          <TextInput
+            style={styles.editInput}
+            value={editCommentText}
+            onChangeText={setEditCommentText}
+            multiline
+          />
+          <View style={styles.editButtons}>
+            <TouchableOpacity 
+              style={styles.cancelButton}
+              onPress={() => setEditingComment(null)}
+            >
+              <Text style={styles.buttonText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.saveButton}
+              onPress={() => handleEditComment(item)}
+            >
+              <Text style={styles.buttonText}>Salvar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        <Text style={styles.commentText}>{item.content}</Text> )}
       
       <TouchableOpacity 
         style={styles.replyButton}
@@ -120,6 +176,37 @@ const ReportDetailScreen = ({ route, navigation }) => {
       ))}
     </View>
   );
+
+  const handleEditComment = async (comment) => {
+  try {
+    const updatedComment = await reportService.editComment(
+      report.id,
+      comment.id,
+      userId,
+      editCommentText
+    );
+    
+    setComments(prev => prev.map(c => 
+      c.id === comment.id ? { ...c, content: updatedComment.content } : c
+    ));
+    setEditingComment(null);
+    setEditCommentText('');
+  } catch (error) {
+    Alert.alert('Erro', error.message);
+  }
+};
+
+const handleDeleteComment = async (commentId) => {
+  try {
+    await reportService.deleteComment(report.id, commentId, userId);
+    setComments(prev => prev.filter(c => c.id !== commentId));
+  } catch (error) {
+    Alert.alert('Erro', error.message);
+  }
+};
+
+
+
 
   if (loading) {
     return (
@@ -435,6 +522,46 @@ const styles = StyleSheet.create({
   commentAuthorContainer: {
     flex: 1,
   },
+
+  commentActions: {
+    flexDirection: 'row',
+    marginLeft: 'auto',
+  },
+  actionIcon: {
+    width: 20,
+    height: 20,
+    marginLeft: 10,
+    tintColor: '#666',
+  },
+  editContainer: {
+    marginTop: 10,
+  },
+  editInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 10,
+    backgroundColor: '#fff',
+    minHeight: 80,
+  },
+  editButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 10,
+  },
+  cancelButton: {
+    padding: 8,
+    marginRight: 10,
+  },
+  saveButton: {
+    backgroundColor: '#FF6B6B',
+    padding: 8,
+    borderRadius: 5,
+  },
+  buttonText: {
+    color: '#fff',
+  },
+
 
 });
 

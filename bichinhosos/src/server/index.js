@@ -334,6 +334,57 @@ app.post('/auth/check-nickname', async (req, res) => {
   }
 });
 
+ // Rota de edicao de comentario do user
+app.put('/api/reports/:reportId/comments/:commentId', async (req, res) => {
+  try {
+    const { commentId, reportId } = req.params;
+    const { content, userId } = req.body;
+
+    // Verifica se o comentário pertence ao usuário
+    const commentCheck = await pool.query(
+      'SELECT * FROM comments WHERE id = $1 AND user_id = $2',
+      [commentId, userId]
+    );
+
+    if (commentCheck.rows.length === 0) {
+      return res.status(403).json({ message: 'Você não pode editar este comentário' });
+    }
+
+    const updatedComment = await pool.query(
+      'UPDATE comments SET content = $1 WHERE id = $2 RETURNING *',
+      [content, commentId]
+    );
+
+    res.json({ comment: updatedComment.rows[0] });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erro ao editar comentário' });
+  }
+});
+
+// Rota para excluir comentário
+app.delete('/api/reports/:reportId/comments/:commentId', async (req, res) => {
+  try {
+    const { commentId, reportId } = req.params;
+    const { userId } = req.body;
+
+    // Verifica se o comentário pertence ao usuário
+    const commentCheck = await pool.query(
+      'SELECT * FROM comments WHERE id = $1 AND user_id = $2',
+      [commentId, userId]
+    );
+
+    if (commentCheck.rows.length === 0) {
+      return res.status(403).json({ message: 'Você não pode excluir este comentário' });
+    }
+
+    await pool.query('DELETE FROM comments WHERE id = $1', [commentId]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erro ao excluir comentário' });
+  }
+});
 
 
 
