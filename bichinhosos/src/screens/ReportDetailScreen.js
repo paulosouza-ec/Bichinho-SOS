@@ -90,10 +90,17 @@ const ReportDetailScreen = ({ route, navigation }) => {
       item.parent_id && styles.replyComment
     ]}>
       <View style={styles.commentHeader}>
-        <Text style={styles.commentAuthor}>{item.user_name}</Text>
-        <Text style={styles.commentDate}>
-          {moment(item.created_at).fromNow()}
-        </Text>
+        {/* Adiciona a imagem do perfil */}
+        <Image 
+          source={{ uri: item.user_avatar || 'https://cdn-icons-png.flaticon.com/512/1946/1946429.png' }} 
+          style={styles.userAvatar}
+        />
+        <View style={styles.commentAuthorContainer}>
+          <Text style={styles.commentAuthor}>{item.user_name}</Text>
+          <Text style={styles.commentDate}>
+            {moment(item.created_at).fromNow()}
+          </Text>
+        </View>
       </View>
       
       <Text style={styles.commentText}>{item.content}</Text>
@@ -375,7 +382,7 @@ const styles = StyleSheet.create({
   },
   commentHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 5,
   },
   commentAuthor: {
@@ -418,6 +425,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
   },
+  userAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 10,
+  },
+
+  commentAuthorContainer: {
+    flex: 1,
+  },
+
 });
 
 export default ReportDetailScreen;

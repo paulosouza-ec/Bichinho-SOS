@@ -231,16 +231,18 @@ app.post('/api/reports/:id/comments', async (req, res) => {
       [id, userId, content, parentId || null]
     );
 
-    // Busca os dados do usuário para retornar com o comentário
+    // Busca os dados do usuário incluindo a foto
     const user = await pool.query(
-      'SELECT id, name FROM users WHERE id = $1',
+      'SELECT id, name, profile_pic FROM users WHERE id = $1',
       [userId]
     );
 
     res.json({ 
       comment: {
         ...newComment.rows[0],
-        user: user.rows[0]
+        user: user.rows[0],
+        user_name: user.rows[0].name,
+        user_avatar: user.rows[0].profile_pic
       }
     });
   } catch (error) {
@@ -255,7 +257,7 @@ app.get('/api/reports/:id/comments', async (req, res) => {
     const { id } = req.params;
 
     const comments = await pool.query(
-      `SELECT c.*, u.name as user_name 
+      `SELECT c.*, u.name as user_name, u.profile_pic as user_avatar 
        FROM comments c
        JOIN users u ON c.user_id = u.id
        WHERE c.report_id = $1
