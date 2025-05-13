@@ -93,7 +93,14 @@ const HomeScreen = ({ navigation, route }) => {
         <TouchableOpacity onPress={() => setFilterModalVisible(true)}>
           <MaterialIcons name="filter-list" size={26} color="#fff" />
         </TouchableOpacity>
-      </View>
+        <TouchableOpacity 
+      onPress={() => navigation.navigate('Profile', { userId })}
+      style={{ marginLeft: 15 }}
+    >
+      <MaterialIcons name="account-circle" size={26} color="#fff" />
+    </TouchableOpacity>
+  </View>
+  
 
       <View style={styles.tabContainer}>
         {['all', 'my'].map(tab => (
@@ -185,6 +192,9 @@ const HomeScreen = ({ navigation, route }) => {
     </View>
   );
 };
+
+
+
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f9fa' },
@@ -299,6 +309,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   closeButtonText: { color: '#fff', fontWeight: 'bold' },
+
+
+  headerIcons: {
+  flexDirection: 'row',
+},
+
 });
 
 export default HomeScreen;

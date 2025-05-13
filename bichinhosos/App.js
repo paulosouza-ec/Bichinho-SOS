@@ -44,7 +44,7 @@ export default function App() {
 
 
         <Stack.Screen 
-          name="ProfileScreen" 
+          name="Profile" 
           component={ProfileScreen}
           options={{ title: 'Meu perfil'}}
         />

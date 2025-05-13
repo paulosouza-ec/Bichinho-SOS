@@ -9,7 +9,8 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
-  TextInput
+  TextInput,
+  RefreshControl
 } from 'react-native';
 import { MaterialIcons, FontAwesome } from '@expo/vector-icons';
 import { authService, reportService } from '../services/database';
