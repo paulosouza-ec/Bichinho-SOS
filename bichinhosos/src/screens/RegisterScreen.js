@@ -5,14 +5,13 @@ import {
   TextInput, 
   TouchableOpacity, 
   StyleSheet, 
-  Image, 
-  KeyboardAvoidingView, 
-  Platform, 
-  ScrollView,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
   ActivityIndicator,
+  ScrollView,
   Alert
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -34,7 +33,7 @@ const RegisterScreen = ({ navigation }) => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permissão necessária', 'Precisamos acessar sua galeria');
+        Alert.alert('Permissão necessária', 'Precisamos acessar sua galeria para selecionar uma foto');
         return;
       }
 
@@ -83,7 +82,7 @@ const RegisterScreen = ({ navigation }) => {
         profile_pic: profilePic
       });
       
-      Alert.alert('Sucesso', 'Cadastro realizado!', [
+      Alert.alert('Sucesso', 'Cadastro realizado com sucesso!', [
         { text: 'OK', onPress: () => navigation.navigate('Login') }
       ]);
       
@@ -96,60 +95,61 @@ const RegisterScreen = ({ navigation }) => {
   };
 
   return (
-    <LinearGradient
-      colors={['#FF6B6B', '#4ECDC4']}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardAvoidingView}
-      >
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <View style={styles.logoContainer}>
-            <Image
-              source={require('../assets/pawprint.png')}
-              style={styles.logo}
-            />
-            <Text style={styles.appName}>Bichinhos SOS</Text>
-            <Text style={styles.slogan}>Junte-se à nossa comunidade</Text>
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        {/* Logo e Título */}
+        <View style={styles.header}>
+          <Image
+            source={require('../assets/pawprint.png')}
+            style={styles.logo}
+          />
+          <Text style={styles.appTitle}>Bichinho-SOS</Text>
+          <Text style={styles.appSubtitle}>Protegendo os animais juntos</Text>
+        </View>
+
+        {/* Formulário */}
+        <View style={styles.formContainer}>
+          <Text style={styles.welcomeText}>Crie sua conta</Text>
+          
+          {/* Foto de perfil */}
+          <View style={styles.profilePicContainer}>
+            <TouchableOpacity onPress={pickImage}>
+              <Image
+                source={profilePic ? { uri: profilePic } : DEFAULT_PROFILE_IMAGE}
+                style={styles.profilePic}
+              />
+              <View style={styles.cameraIcon}>
+                <MaterialIcons name="camera-alt" size={16} color="#fff" />
+              </View>
+            </TouchableOpacity>
+            <Text style={styles.profilePicText}>
+              {profilePic ? 'Alterar foto' : 'Adicionar foto (opcional)'}
+            </Text>
           </View>
 
-          <View style={styles.formContainer}>
-            <Text style={styles.welcomeText}>Crie sua conta</Text>
-            
-            {/* Seção de foto de perfil */}
-            <View style={styles.profilePicContainer}>
-              <TouchableOpacity onPress={pickImage}>
-                <Image 
-                  source={profilePic ? { uri: profilePic } : DEFAULT_PROFILE_IMAGE}
-                  style={styles.profilePic}
-                />
-                <View style={styles.cameraIcon}>
-                  <MaterialIcons name="camera-alt" size={20} color="#fff" />
-                </View>
-              </TouchableOpacity>
-              <Text style={styles.profilePicText}>
-                {profilePic ? 'Alterar foto' : 'Adicionar foto (opcional)'}
-              </Text>
-            </View>
-
-            {/* Campos do formulário */}
+          {/* Campos do formulário */}
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>Nome completo</Text>
             <View style={styles.inputContainer}>
-              <Icon name="user" size={20} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Nome completo"
+                placeholder="Digite seu nome completo"
                 placeholderTextColor="#999"
                 value={name}
                 onChangeText={setName}
               />
             </View>
+          </View>
 
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>Email</Text>
             <View style={styles.inputContainer}>
-              <Icon name="envelope" size={20} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Email"
+                placeholder="seu@email.com"
                 placeholderTextColor="#999"
                 value={email}
                 onChangeText={setEmail}
@@ -157,12 +157,14 @@ const RegisterScreen = ({ navigation }) => {
                 autoCapitalize="none"
               />
             </View>
+          </View>
 
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>Senha</Text>
             <View style={styles.inputContainer}>
-              <Icon name="lock" size={20} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Senha"
+                placeholder="••••••••"
                 placeholderTextColor="#999"
                 value={password}
                 onChangeText={setPassword}
@@ -172,108 +174,121 @@ const RegisterScreen = ({ navigation }) => {
                 style={styles.eyeIcon} 
                 onPress={() => setShowPassword(!showPassword)}
               >
-                <Icon name={showPassword ? 'eye-slash' : 'eye'} size={20} color="#666" />
+                <Icon 
+                  name={showPassword ? 'eye-slash' : 'eye'} 
+                  size={20} 
+                  color="#999" 
+                />
               </TouchableOpacity>
             </View>
+          </View>
 
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>Telefone</Text>
             <View style={styles.inputContainer}>
-              <Icon name="phone" size={20} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Telefone (com DDD)"
+                placeholder="(00) 00000-0000"
                 placeholderTextColor="#999"
                 value={phone}
                 onChangeText={setPhone}
                 keyboardType="phone-pad"
-                maxLength={11}
+                maxLength={15}
               />
             </View>
+          </View>
 
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>Nickname</Text>
             <View style={styles.inputContainer}>
-              <Icon name="at" size={20} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Nickname"
+                placeholder="Escolha um nome de usuário"
                 placeholderTextColor="#999"
                 value={nickname}
                 onChangeText={setNickname}
                 autoCapitalize="none"
               />
             </View>
-
-            <TouchableOpacity 
-              style={styles.registerButton} 
-              onPress={handleRegister}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.registerButtonText}>Cadastrar</Text>
-              )}
-            </TouchableOpacity>
-
-            <View style={styles.loginContainer}>
-              <Text style={styles.loginText}>Já tem uma conta?</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-                <Text style={styles.loginLink}>Faça login</Text>
-              </TouchableOpacity>
-            </View>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </LinearGradient>
+
+          {/* Botão de Cadastro */}
+          <TouchableOpacity 
+            style={styles.registerButton}
+            onPress={handleRegister}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.registerButtonText}>Cadastrar</Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Divisor */}
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>ou</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Link para Login */}
+          <TouchableOpacity 
+            style={styles.loginButton}
+            onPress={() => navigation.navigate('Login')}
+          >
+            <Text style={styles.loginButtonText}>Já tem uma conta? Faça login</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  keyboardAvoidingView: {
-    flex: 1,
+    backgroundColor: '#f8f9fa',
   },
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: 20,
   },
-  logoContainer: {
+  header: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 30,
+    paddingTop: 20,
   },
   logo: {
     width: 80,
     height: 80,
-    marginBottom: 10,
+    marginBottom: 15,
   },
-  appName: {
-    fontSize: 24,
+  appTitle: {
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#2c3e50',
     marginBottom: 5,
   },
-  slogan: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
+  appSubtitle: {
+    fontSize: 16,
+    color: '#7f8c8d',
   },
   formContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 20,
+    backgroundColor: '#fff',
+    marginHorizontal: 25,
     padding: 25,
+    borderRadius: 15,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   welcomeText: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#333',
+    color: '#2c3e50',
     marginBottom: 20,
     textAlign: 'center',
   },
@@ -286,13 +301,13 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     borderWidth: 2,
-    borderColor: '#FF6B6B',
+    borderColor: '#dfe6e9',
   },
   cameraIcon: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: '#FF6B6B',
+    bottom: 5,
+    right: 5,
+    backgroundColor: '#27ae60',
     borderRadius: 15,
     width: 30,
     height: 30,
@@ -301,65 +316,81 @@ const styles = StyleSheet.create({
   },
   profilePicText: {
     marginTop: 8,
-    color: '#666',
-    fontSize: 12,
+    color: '#7f8c8d',
+    fontSize: 14,
+  },
+  inputWrapper: {
+    marginBottom: 15,
+  },
+  inputLabel: {
+    color: '#2c3e50',
+    marginBottom: 8,
+    fontWeight: '500',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#dfe6e9',
     borderRadius: 10,
     paddingHorizontal: 15,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: '#e1e1e1',
-  },
-  inputIcon: {
-    marginRight: 10,
+    backgroundColor: '#f8f9fa',
   },
   input: {
     flex: 1,
     height: 50,
-    color: '#333',
+    color: '#2c3e50',
     fontSize: 16,
   },
   eyeIcon: {
     padding: 10,
   },
   registerButton: {
-    backgroundColor: '#FF6B6B',
+    backgroundColor: '#27ae60',
     borderRadius: 10,
     height: 50,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 10,
-    shadowColor: '#FF6B6B',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    shadowColor: '#27ae60',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
+    shadowRadius: 4,
+    elevation: 3,
   },
   registerButtonText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
   },
-  loginContainer: {
-    marginTop: 20,
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#dfe6e9',
+  },
+  dividerText: {
+    width: 40,
+    textAlign: 'center',
+    color: '#7f8c8d',
+    fontSize: 14,
+  },
+  loginButton: {
+    borderWidth: 1,
+    borderColor: '#27ae60',
+    borderRadius: 10,
+    height: 50,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  loginText: {
-    color: '#666',
-    fontSize: 14,
-  },
-  loginLink: {
-    color: '#FF6B6B',
-    fontSize: 14,
+  loginButtonText: {
+    color: '#27ae60',
+    fontSize: 16,
     fontWeight: '600',
-    marginTop: 5,
   },
 });
 

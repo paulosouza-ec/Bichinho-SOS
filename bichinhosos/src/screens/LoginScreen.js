@@ -1,7 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
+import { 
+  View, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  StyleSheet, 
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  ScrollView
+} from 'react-native';
 import { authService } from '../services/database';
-import { LinearGradient } from 'expo-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome';
 
 const LoginScreen = ({ navigation }) => {
@@ -15,7 +25,7 @@ const LoginScreen = ({ navigation }) => {
       alert('Erro', 'Preencha todos os campos');
       return;
     }
-
+  
     setLoading(true);
     try {
       const user = await authService.loginUser(email, password);
@@ -32,46 +42,48 @@ const LoginScreen = ({ navigation }) => {
   };
 
   return (
-    <LinearGradient
-      colors={['#FF6B6B', '#4ECDC4']}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardAvoidingView}
-      >
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <View style={styles.logoContainer}>
-            <Image
-              source={require('../assets/pawprint.png')} 
-              style={styles.logo}
-            />
-            <Text style={styles.appName}>Bichinhos SOS</Text>
-            <Text style={styles.slogan}>Protegendo os animais juntos</Text>
-          </View>
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        {/* Logo e Título */}
+        <View style={styles.header}>
+          <Image
+            source={require('../assets/pawprint.png')}
+            style={styles.logo}
+          />
+          <Text style={styles.appTitle}>BichinhoSOS</Text>
+          <Text style={styles.appSubtitle}>Protegendo os animais juntos</Text>
+        </View>
 
-          <View style={styles.formContainer}>
-            <Text style={styles.welcomeText}>Bem-vindo de volta!</Text>
-            
+        {/* Formulário */}
+        <View style={styles.formContainer}>
+          <Text style={styles.welcomeText}>Bem-vindo de volta!</Text>
+          
+          {/* Campo Email */}
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>Email</Text>
             <View style={styles.inputContainer}>
-              <Icon name="envelope" size={20} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Email"
+                placeholder="seu@email.com"
                 placeholderTextColor="#999"
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                autoCorrect={false}
               />
             </View>
+          </View>
 
+          {/* Campo Senha */}
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>Senha</Text>
             <View style={styles.inputContainer}>
-              <Icon name="lock" size={24} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Senha"
+                placeholder="••••••••"
                 placeholderTextColor="#999"
                 value={password}
                 onChangeText={setPassword}
@@ -81,113 +93,119 @@ const LoginScreen = ({ navigation }) => {
                 style={styles.eyeIcon} 
                 onPress={() => setShowPassword(!showPassword)}
               >
-                <Icon name={showPassword ? 'eye-slash' : 'eye'} size={20} color="#666" />
+                <Icon 
+                  name={showPassword ? 'eye-slash' : 'eye'} 
+                  size={20} 
+                  color="#999" 
+                />
               </TouchableOpacity>
             </View>
-
             <TouchableOpacity style={styles.forgotPassword}>
               <Text style={styles.forgotPasswordText}>Esqueceu sua senha?</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.loginButton} 
-              onPress={handleLogin}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.loginButtonText}>Entrar</Text>
-              )}
-            </TouchableOpacity>
-
-            <View style={styles.dividerContainer}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>ou</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <TouchableOpacity 
-              style={styles.registerButton}
-              onPress={() => navigation.navigate('Register')}
-            >
-              <Text style={styles.registerButtonText}>Criar uma conta</Text>
-            </TouchableOpacity>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </LinearGradient>
+
+          {/* Botão de Login */}
+          <TouchableOpacity 
+            style={styles.loginButton}
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.loginButtonText}>Entrar</Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Divisor */}
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>ou</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Botão de Cadastro */}
+          <TouchableOpacity 
+            style={styles.registerButton}
+            onPress={() => navigation.navigate('Register')}
+          >
+            <Text style={styles.registerButtonText}>Criar uma conta</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  keyboardAvoidingView: {
-    flex: 1,
+    backgroundColor: '#f8f9fa',
   },
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: 20,
   },
-  logoContainer: {
+  header: {
     alignItems: 'center',
     marginBottom: 40,
+    paddingTop: 20,
   },
   logo: {
-    width: 100,
-    height: 100,
+    width: 80,
+    height: 80,
     marginBottom: 15,
   },
-  appName: {
+  appTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#2c3e50',
     marginBottom: 5,
   },
-  slogan: {
+  appSubtitle: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: '#7f8c8d',
   },
   formContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 20,
+    backgroundColor: '#fff',
+    marginHorizontal: 25,
     padding: 25,
+    borderRadius: 15,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   welcomeText: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '600',
-    color: '#333',
+    color: '#2c3e50',
     marginBottom: 25,
     textAlign: 'center',
+  },
+  inputWrapper: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    color: '#2c3e50',
+    marginBottom: 8,
+    fontWeight: '500',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#dfe6e9',
     borderRadius: 10,
     paddingHorizontal: 15,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: '#e1e1e1',
-  },
-  inputIcon: {
-    marginRight: 10,
+    backgroundColor: '#f8f9fa',
   },
   input: {
     flex: 1,
     height: 50,
-    color: '#333',
+    color: '#2c3e50',
     fontSize: 16,
   },
   eyeIcon: {
@@ -195,58 +213,56 @@ const styles = StyleSheet.create({
   },
   forgotPassword: {
     alignSelf: 'flex-end',
-    marginBottom: 20,
+    marginTop: 8,
   },
   forgotPasswordText: {
-    color: '#FF6B6B',
+    color: '#3498db',
     fontSize: 14,
   },
   loginButton: {
-    backgroundColor: '#FF6B6B',
+    backgroundColor: '#27ae60',
     borderRadius: 10,
     height: 50,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: '#FF6B6B',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    marginTop: 10,
+    shadowColor: '#27ae60',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
+    shadowRadius: 4,
+    elevation: 3,
   },
   loginButtonText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
   },
-  dividerContainer: {
+  divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginVertical: 20,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#e1e1e1',
+    backgroundColor: '#dfe6e9',
   },
   dividerText: {
     width: 40,
     textAlign: 'center',
-    color: '#999',
+    color: '#7f8c8d',
+    fontSize: 14,
   },
   registerButton: {
     borderWidth: 1,
-    borderColor: '#FF6B6B',
+    borderColor: '#27ae60',
     borderRadius: 10,
     height: 50,
     justifyContent: 'center',
     alignItems: 'center',
   },
   registerButtonText: {
-    color: '#FF6B6B',
+    color: '#27ae60',
     fontSize: 16,
     fontWeight: '600',
   },

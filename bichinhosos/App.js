@@ -7,6 +7,7 @@ import RegisterScreen from './src/screens/RegisterScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import ReportScreen from './src/screens/ReportScreen';
 import ReportDetailScreen from './src/screens/ReportDetailScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
 
 const Stack = createStackNavigator();
 
@@ -41,6 +42,12 @@ export default function App() {
           options={{headerShown: false}}
         />
 
+
+        <Stack.Screen 
+          name="ProfileScreen" 
+          component={ProfileScreen}
+          options={{ title: 'Meu perfil'}}
+        />
 
 
       </Stack.Navigator>

@@ -1,10 +1,11 @@
+// HomeScreen.js
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  FlatList, 
-  StyleSheet, 
-  TouchableOpacity, 
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
   Modal,
@@ -20,8 +21,8 @@ const HomeScreen = ({ navigation, route }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterModalVisible, setFilterModalVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState('all'); // 'all' ou 'my'
-  const [filter, setFilter] = useState('all'); // 'all', 'anonymous', 'identified'
+  const [activeTab, setActiveTab] = useState('all');
+  const [filter, setFilter] = useState('all');
   const userId = route.params?.userId;
 
   useEffect(() => {
@@ -31,18 +32,9 @@ const HomeScreen = ({ navigation, route }) => {
   const loadReports = async () => {
     try {
       setLoading(true);
-      
-      let params = {};
-      
-      if (activeTab === 'my') {
-        params.userId = userId;
-      } else {
-        params.filter = filter;
-      }
-      
+      const params = activeTab === 'my' ? { userId } : { filter };
       const reportsData = await reportService.getReports(params);
       setReports(reportsData);
-      
     } catch (error) {
       console.error('Erro ao carregar denúncias:', error);
       Alert.alert('Erro', error.message);
@@ -52,49 +44,42 @@ const HomeScreen = ({ navigation, route }) => {
     }
   };
 
-
   const handleRefresh = () => {
     setRefreshing(true);
     loadReports();
   };
 
-  const filteredReports = reports.filter(report => {
-    return (
-      report.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      report.description.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  });
+  const filteredReports = reports.filter(report =>
+    report.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    report.description.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const renderReport = ({ item }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.reportItem}
       onPress={() => navigation.navigate('ReportDetail', { report: item, userId })}
     >
       <View style={styles.reportHeader}>
         <Text style={styles.reportTitle}>{item.title}</Text>
-        <Text style={styles.reportDate}>
-          {new Date(item.created_at).toLocaleDateString('pt-BR')}
-        </Text>
+        <Text style={styles.reportDate}>{new Date(item.created_at).toLocaleDateString('pt-BR')}</Text>
       </View>
-      
+
       <Text style={styles.reportDescription}>
         {item.description.substring(0, 100)}...
       </Text>
-      
+
       {item.location && (
         <View style={styles.locationContainer}>
-          <MaterialIcons name="location-on" size={16} color="#666" />
+          <MaterialIcons name="location-on" size={16} color="#7f8c8d" />
           <Text style={styles.reportLocation}>{item.location}</Text>
         </View>
       )}
-      
+
       <View style={styles.reportFooter}>
-        {item.is_anonymous ? (
-          <Text style={styles.anonymousBadge}>Anônima</Text>
-        ) : (
-          <Text style={styles.userBadge}>Identificada</Text>
-        )}
-        {activeTab === 'all' && !item.is_anonymous && item.user_name && (
+        <Text style={[styles.badge, item.is_anonymous ? styles.anonymous : styles.identified]}>
+          {item.is_anonymous ? 'Anônima' : 'Identificada'}
+        </Text>
+        {!item.is_anonymous && item.user_name && activeTab === 'all' && (
           <Text style={styles.authorText}>Por: {item.user_name}</Text>
         )}
       </View>
@@ -104,62 +89,53 @@ const HomeScreen = ({ navigation, route }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Bichinho SOS</Text>
+        <Text style={styles.headerTitle}>BichinhoSOS</Text>
         <TouchableOpacity onPress={() => setFilterModalVisible(true)}>
-          <MaterialIcons name="filter-list" size={24} color="#fff" />
+          <MaterialIcons name="filter-list" size={26} color="#fff" />
         </TouchableOpacity>
       </View>
 
-      {/* Abas */}
       <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'all' && styles.activeTab]}
-          onPress={() => setActiveTab('all')}
-        >
-          <Text style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>Todas</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'my' && styles.activeTab]}
-          onPress={() => setActiveTab('my')}
-        >
-          <Text style={[styles.tabText, activeTab === 'my' && styles.activeTabText]}>Minhas</Text>
-        </TouchableOpacity>
+        {['all', 'my'].map(tab => (
+          <TouchableOpacity
+            key={tab}
+            style={[styles.tabButton, activeTab === tab && styles.activeTab]}
+            onPress={() => setActiveTab(tab)}
+          >
+            <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
+              {tab === 'all' ? 'Todas' : 'Minhas'}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
           placeholder="Buscar denúncias..."
+          placeholderTextColor="#999"
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
-        <MaterialIcons name="search" size={24} color="#666" style={styles.searchIcon} />
+        <MaterialIcons name="search" size={22} color="#999" />
       </View>
 
-      {loading && filteredReports.length === 0 ? (
+      {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FF6B6B" />
+          <ActivityIndicator size="large" color="#27ae60" />
         </View>
       ) : (
         <FlatList
           data={filteredReports}
           renderItem={renderReport}
           keyExtractor={item => item.id.toString()}
-          style={styles.list}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              colors={['#FF6B6B']}
-            />
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#27ae60']} />
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>
-                {activeTab === 'all' 
-                  ? 'Nenhuma denúncia encontrada' 
-                  : 'Você ainda não fez nenhuma denúncia'}
+                {activeTab === 'all' ? 'Nenhuma denúncia encontrada' : 'Você ainda não fez denúncias'}
               </Text>
             </View>
           }
@@ -170,54 +146,37 @@ const HomeScreen = ({ navigation, route }) => {
         style={styles.addButton}
         onPress={() => navigation.navigate('Report', { userId })}
       >
-        <MaterialIcons name="add" size={30} color="#fff" />
+        <MaterialIcons name="add" size={28} color="#fff" />
       </TouchableOpacity>
 
-      {/* Modal de Filtros */}
       <Modal
         animationType="slide"
-        transparent={true}
+        transparent
         visible={filterModalVisible}
         onRequestClose={() => setFilterModalVisible(false)}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Filtrar Denúncias</Text>
-            
-            <TouchableOpacity
-              style={[styles.filterOption, filter === 'all' && styles.filterOptionSelected]}
-              onPress={() => {
-                setFilter('all');
-                setFilterModalVisible(false);
-              }}
-            >
-              <Text style={styles.filterOptionText}>Todas as denúncias</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.filterOption, filter === 'anonymous' && styles.filterOptionSelected]}
-              onPress={() => {
-                setFilter('anonymous');
-                setFilterModalVisible(false);
-              }}
-            >
-              <Text style={styles.filterOptionText}>Denúncias anônimas</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.filterOption, filter === 'identified' && styles.filterOptionSelected]}
-              onPress={() => {
-                setFilter('identified');
-                setFilterModalVisible(false);
-              }}
-            >
-              <Text style={styles.filterOptionText}>Denúncias identificadas</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setFilterModalVisible(false)}
-            >
+            {['all', 'anonymous', 'identified'].map(option => (
+              <TouchableOpacity
+                key={option}
+                style={[styles.filterOption, filter === option && styles.filterOptionSelected]}
+                onPress={() => {
+                  setFilter(option);
+                  setFilterModalVisible(false);
+                }}
+              >
+                <Text style={styles.filterOptionText}>
+                  {option === 'all'
+                    ? 'Todas as denúncias'
+                    : option === 'anonymous'
+                    ? 'Denúncias anônimas'
+                    : 'Denúncias identificadas'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity style={styles.closeButton} onPress={() => setFilterModalVisible(false)}>
               <Text style={styles.closeButtonText}>Fechar</Text>
             </TouchableOpacity>
           </View>
@@ -228,243 +187,118 @@ const HomeScreen = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
+  container: { flex: 1, backgroundColor: '#f8f9fa' },
   header: {
-    backgroundColor: '#FF6B6B',
+    backgroundColor: '#27ae60',
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 15,
-    paddingTop: 40,
   },
-  headerTitle: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
+  headerTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    marginHorizontal: 15,
-    marginTop: 10,
-    borderRadius: 8,
-    overflow: 'hidden',
-    elevation: 2,
+    marginHorizontal: 20,
+    marginTop: 15,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 10,
   },
-  tabButton: {
-    flex: 1,
-    padding: 12,
-    alignItems: 'center',
-  },
-  activeTab: {
-    backgroundColor: '#FF6B6B',
-  },
-  tabText: {
-    color: '#666',
-    fontWeight: 'bold',
-  },
-  activeTabText: {
-    color: '#fff',
-  },
+  tabButton: { flex: 1, padding: 12, alignItems: 'center' },
+  tabText: { color: '#2c3e50', fontWeight: '500' },
+  activeTab: { backgroundColor: '#27ae60', borderRadius: 10 },
+  activeTabText: { color: '#fff', fontWeight: 'bold' },
   searchContainer: {
     backgroundColor: '#fff',
-    margin: 15,
-    borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    borderRadius: 10,
+    margin: 20,
+    borderWidth: 1,
+    borderColor: '#dcdcdc',
   },
   searchInput: {
     flex: 1,
     height: 45,
-    paddingLeft: 10,
-  },
-  searchIcon: {
-    marginLeft: 10,
-  },
-  list: {
-    flex: 1,
+    fontSize: 16,
+    color: '#333',
   },
   reportItem: {
     backgroundColor: '#fff',
-    marginHorizontal: 15,
-    marginBottom: 10,
-    borderRadius: 10,
+    marginHorizontal: 20,
+    marginBottom: 15,
     padding: 15,
+    borderRadius: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
     elevation: 2,
   },
-  reportHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  reportTitle: {
+  reportHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  reportTitle: { fontSize: 16, fontWeight: 'bold', color: '#2c3e50' },
+  reportDate: { fontSize: 12, color: '#7f8c8d' },
+  reportDescription: { fontSize: 14, color: '#444', marginVertical: 6 },
+  locationContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  reportLocation: { marginLeft: 5, fontSize: 13, color: '#7f8c8d' },
+  reportFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    fontSize: 12,
     fontWeight: 'bold',
-    fontSize: 16,
-    color: '#333',
-    flex: 1,
   },
-  reportDate: {
-    color: '#666',
-    fontSize: 12,
-  },
-  reportDescription: {
-    color: '#555',
-    marginBottom: 10,
-  },
-  locationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  reportLocation: {
-    color: '#666',
-    fontSize: 12,
-    marginLeft: 5,
-  },
-  reportFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  anonymousBadge: {
-    backgroundColor: '#f0f0f0',
-    color: '#666',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    fontSize: 12,
-  },
-  userBadge: {
-    backgroundColor: '#e3f2fd',
-    color: '#1976d2',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    fontSize: 12,
-  },
-  authorText: {
-    fontSize: 12,
-    color: '#666',
-    fontStyle: 'italic',
-  },
+  anonymous: { backgroundColor: '#f0f0f0', color: '#888' },
+  identified: { backgroundColor: '#e9fbe9', color: '#27ae60' },
+  authorText: { fontSize: 12, fontStyle: 'italic', color: '#888' },
   addButton: {
     position: 'absolute',
+    right: 25,
     bottom: 30,
-    right: 30,
-    backgroundColor: '#FF6B6B',
+    backgroundColor: '#27ae60',
     width: 60,
     height: 60,
     borderRadius: 30,
-    justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    justifyContent: 'center',
     elevation: 5,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 50,
-  },
-  emptyText: {
-    color: '#888',
-    fontSize: 16,
-    textAlign: 'center',
-    paddingHorizontal: 20,
-  },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  emptyText: { color: '#888', fontSize: 16, textAlign: 'center' },
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   modalContent: {
     backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 20,
+    padding: 25,
+    borderRadius: 12,
     width: '80%',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 20,
+    color: '#2c3e50',
     textAlign: 'center',
+    marginBottom: 15,
   },
-  filterOption: {
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  filterOptionSelected: {
-    backgroundColor: '#f5f5f5',
-  },
-  filterOptionText: {
-    fontSize: 16,
-  },
+  filterOption: { paddingVertical: 12 },
+  filterOptionSelected: { backgroundColor: '#f0f0f0' },
+  filterOptionText: { fontSize: 16, color: '#2c3e50' },
   closeButton: {
     marginTop: 20,
-    padding: 10,
-    backgroundColor: '#FF6B6B',
-    borderRadius: 5,
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    marginHorizontal: 15,
-    marginTop: 10,
-    borderRadius: 8,
-    overflow: 'hidden',
-    elevation: 2,
-  },
-  tabButton: {
-    flex: 1,
+    backgroundColor: '#27ae60',
     padding: 12,
+    borderRadius: 10,
     alignItems: 'center',
   },
-  activeTab: {
-    backgroundColor: '#FF6B6B',
-  },
-  tabText: {
-    color: '#666',
-    fontWeight: 'bold',
-  },
-  activeTabText: {
-    color: '#fff',
-  },
-  authorText: {
-    fontSize: 12,
-    color: '#666',
-    fontStyle: 'italic',
-  },
-
-
+  closeButtonText: { color: '#fff', fontWeight: 'bold' },
 });
 
 export default HomeScreen;
