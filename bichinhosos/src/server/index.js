@@ -387,6 +387,130 @@ app.delete('/api/reports/:reportId/comments/:commentId', async (req, res) => {
 });
 
 
+app.get('/users/:id/profile', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const user = await pool.query(
+      'SELECT id, name, email, nickname, profile_pic, bio FROM users WHERE id = $1',
+      [id]
+    );
+    
+    if (user.rows.length === 0) {
+      return res.status(404).json({ message: 'Usuário não encontrado' });
+    }
+    
+    res.json({ user: user.rows[0] });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erro ao buscar perfil' });
+  }
+});
+
+// Rota para atualizar perfil do usuário
+app.put('/users/:id/profile', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { bio } = req.body;
+    
+    const updatedUser = await pool.query(
+      'UPDATE users SET bio = $1 WHERE id = $2 RETURNING id, name, email, nickname, profile_pic, bio',
+      [bio, id]
+    );
+    
+    res.json({ user: updatedUser.rows[0] });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erro ao atualizar perfil' });
+  }
+});
+
+// Rota para obter denúncias do usuário
+app.get('/users/:id/reports', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const reports = await pool.query(
+      'SELECT * FROM reports WHERE user_id = $1 ORDER BY created_at DESC',
+      [id]
+    );
+    
+    res.json({ reports: reports.rows });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erro ao buscar denúncias' });
+  }
+});
+
+// Rota para excluir denúncia
+app.delete('/api/reports/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId } = req.body;
+    
+    // Verifica se a denúncia pertence ao usuário
+    const reportCheck = await pool.query(
+      'SELECT * FROM reports WHERE id = $1 AND user_id = $2',
+      [id, userId]
+    );
+    
+    if (reportCheck.rows.length === 0) {
+      return res.status(403).json({ message: 'Você não pode excluir esta denúncia' });
+    }
+    
+    // Primeiro exclui os comentários e likes associados
+    await pool.query('DELETE FROM comments WHERE report_id = $1', [id]);
+    await pool.query('DELETE FROM likes WHERE report_id = $1', [id]);
+    
+    // Depois exclui a denúncia
+    await pool.query('DELETE FROM reports WHERE id = $1', [id]);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erro ao excluir denúncia' });
+  }
+});
+
+// Rota para obter estatísticas do usuário
+app.get('/users/:id/stats', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Conta denúncias do usuário
+    const reportsCount = await pool.query(
+      'SELECT COUNT(*) FROM reports WHERE user_id = $1',
+      [id]
+    );
+    
+    // Conta curtidas recebidas nas denúncias do usuário
+    const likesReceived = await pool.query(
+      `SELECT COUNT(*) FROM likes l
+       JOIN reports r ON l.report_id = r.id
+       WHERE r.user_id = $1`,
+      [id]
+    );
+    
+    // Conta comentários feitos pelo usuário
+    const commentsCount = await pool.query(
+      'SELECT COUNT(*) FROM comments WHERE user_id = $1',
+      [id]
+    );
+    
+    res.json({
+      stats: {
+        reportsCount: parseInt(reportsCount.rows[0].count),
+        likesReceived: parseInt(likesReceived.rows[0].count),
+        commentsCount: parseInt(commentsCount.rows[0].count)
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erro ao buscar estatísticas' });
+  }
+});
+
+
 
 // Inicia o servidor
 app.listen(port, () => {
