@@ -32,6 +32,26 @@ export const authService = {
     }
   },
 
+  getUserProfile: async (userId) => {
+  try {
+    const response = await api.get(`/users/${userId}/profile`);
+    return response.data.user;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Erro ao carregar perfil');
+  }
+},
+
+updateUserProfile: async (userId, profileData) => {
+  try {
+    const response = await api.put(`/users/${userId}/profile`, profileData);
+    return response.data.user;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Erro ao atualizar perfil');
+  }
+},
+
+
+
 
 };
 
@@ -141,6 +161,37 @@ export const reportService = {
     }
   },
   
+
+  getUserReports: async (userId) => {
+  try {
+    const response = await api.get(`/users/${userId}/reports`);
+    return response.data.reports;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Erro ao buscar denúncias');
+  }
+},
+
+deleteReport: async (reportId, userId) => {
+  try {
+    const response = await api.delete(`/api/reports/${reportId}`, {
+      data: { userId }
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Erro ao excluir denúncia');
+  }
+},
+
+getUserStats: async (userId) => {
+  try {
+    const response = await api.get(`/users/${userId}/stats`);
+    return response.data.stats;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Erro ao buscar estatísticas');
+  }
+},
+
+
 
 
 };
