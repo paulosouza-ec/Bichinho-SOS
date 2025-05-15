@@ -7,6 +7,9 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 3000;
 
+const multer = require('multer');
+const path = require('path');
+
 // Configuração do PostgreSQL
 const pool = new Pool({
   user: process.env.DB_USER,
@@ -98,32 +101,17 @@ app.post('/auth/login', async (req, res) => {
 // Rotas de denúncias
 app.post('/api/reports', async (req, res) => {
   try {
-    const { userId, title, description, location, isAnonymous } = req.body;
+    const { userId, title, description, location, isAnonymous, photo_uri } = req.body;
     
-    // Validações básicas
-    if (!title || !description) {
-      return res.status(400).json({ message: 'Título e descrição são obrigatórios' });
-    }
-
     const newReport = await pool.query(
-      `INSERT INTO reports (
-        user_id, title, description, location, 
-        is_anonymous, photo_uri
-      ) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [
-        isAnonymous ? null : userId,
-        title,
-        description,
-        location || null,
-        isAnonymous,
-        req.body.photo || null
-      ]
+      `INSERT INTO reports (user_id, title, description, location, is_anonymous, photo_uri)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [isAnonymous ? null : userId, title, description, location || null, isAnonymous, photo_uri || null]
     );
     
     res.json({ report: newReport.rows[0] });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Erro ao criar denúncia' });
+    res.status(500).json({ error: 'Erro ao criar denúncia' });
   }
 });
 
@@ -509,6 +497,30 @@ app.get('/users/:id/stats', async (req, res) => {
     res.status(500).json({ message: 'Erro ao buscar estatísticas' });
   }
 });
+
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/'); // Pasta onde as imagens serão salvas
+  },
+  filename: (req, file, cb) => {
+    cb(null, `report-${Date.now()}${path.extname(file.originalname)}`);
+  }
+});
+
+const upload = multer({ storage });
+
+// Rota para upload:
+app.post('/api/upload', upload.single('image'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Nenhuma imagem enviada' });
+  }
+  const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+  res.json({ imageUrl });
+});
+
+// Servir arquivos estáticos:
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
 

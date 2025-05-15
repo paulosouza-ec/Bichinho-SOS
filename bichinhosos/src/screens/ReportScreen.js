@@ -9,13 +9,12 @@ import {
   TouchableOpacity, 
   Image,
   ScrollView,
-  ActivityIndicator
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { MaterialIcons } from '@expo/vector-icons';
 import { reportService } from '../services/database';
-
-
 
 const ReportScreen = ({ navigation, route }) => {
   const { userId } = route.params;
@@ -50,15 +49,14 @@ const ReportScreen = ({ navigation, route }) => {
       Alert.alert('Atenção', 'Informe um título para a denúncia');
       return;
     }
-  
+
     if (!description.trim() || description.length < 10) {
       Alert.alert('Atenção', 'Descrição precisa ter pelo menos 10 caracteres');
       return;
     }
-  
+
     setLoading(true);
     try {
-      // Criar objeto com os dados da denúncia
       const reportData = {
         userId: isAnonymous ? null : userId,
         title: title.trim(),
@@ -67,10 +65,9 @@ const ReportScreen = ({ navigation, route }) => {
         isAnonymous,
         photo: photoUri
       };
-  
-      // Usar o reportService para criar a denúncia
+
       await reportService.createReport(reportData);
-  
+
       Alert.alert('Sucesso', 'Denúncia registrada!', [
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
@@ -81,84 +78,95 @@ const ReportScreen = ({ navigation, route }) => {
       setLoading(false);
     }
   };
-  
+
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Nova Denúncia</Text>
-      
-      <TextInput
-        style={styles.input}
-        placeholder="Título da denúncia*"
-        value={title}
-        onChangeText={setTitle}
-        maxLength={60}
-      />
-      
-      <TextInput
-        style={[styles.input, { height: 120 }]}
-        placeholder="Descreva o ocorrido em detalhes*"
-        value={description}
-        onChangeText={setDescription}
-        multiline
-        maxLength={500}
-      />
-      
-      <TextInput
-        style={styles.input}
-        placeholder="Localização (rua, bairro, cidade)"
-        value={location}
-        onChangeText={setLocation}
-      />
-      
-      <View style={styles.switchContainer}>
-        <Text style={{ fontSize: 16 }}>Enviar como anônimo?</Text>
-        <Switch
-          value={isAnonymous}
-          onValueChange={setIsAnonymous}
-          trackColor={{ false: '#767577', true: '#81b0ff' }}
-          thumbColor={isAnonymous ? '#f5dd4b' : '#f4f3f4'}
-        />
-      </View>
-      
-      <TouchableOpacity 
-        style={styles.photoButton}
-        onPress={pickImage}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}
+    >
+      <ScrollView 
+        style={styles.container}
+        contentContainerStyle={[styles.contentContainer, { flexGrow: 1 }]}
+        keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.photoButtonText}>
-          {photoUri ? 'Alterar Foto' : 'Adicionar Foto'}
-        </Text>
-      </TouchableOpacity>
-      
-      {photoUri && (
-        <View style={styles.imageContainer}>
-          <Image 
-            source={{ uri: photoUri }} 
-            style={styles.imagePreview} 
+        <Text style={styles.title}>Nova Denúncia</Text>
+
+        <TextInput
+          style={styles.input}
+          placeholder="Título da denúncia*"
+          value={title}
+          onChangeText={setTitle}
+          maxLength={60}
+        />
+
+        <TextInput
+          style={[styles.input, { height: 120 }]}
+          placeholder="Descreva o ocorrido em detalhes*"
+          value={description}
+          onChangeText={setDescription}
+          multiline
+          maxLength={500}
+        />
+
+        <TextInput
+          style={styles.input}
+          placeholder="Localização (rua, bairro, cidade)"
+          value={location}
+          onChangeText={setLocation}
+        />
+
+        <View style={styles.switchContainer}>
+          <Text style={{ fontSize: 16 }}>Enviar como anônimo?</Text>
+          <Switch
+            value={isAnonymous}
+            onValueChange={setIsAnonymous}
+            trackColor={{ false: '#767577', true: '#81b0ff' }}
+            thumbColor={isAnonymous ? '#f5dd4b' : '#f4f3f4'}
           />
         </View>
-      )}
-      
-      <TouchableOpacity
-        style={[styles.submitButton, loading && { opacity: 0.7 }]}
-        onPress={submitReport}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.submitButtonText}>ENVIAR DENÚNCIA</Text>
+
+        <TouchableOpacity 
+          style={styles.photoButton}
+          onPress={pickImage}
+        >
+          <Text style={styles.photoButtonText}>
+            {photoUri ? 'Alterar Foto' : 'Adicionar Foto'}
+          </Text>
+        </TouchableOpacity>
+
+        {photoUri && (
+          <View style={styles.imageContainer}>
+            <Image 
+              source={{ uri: photoUri }} 
+              style={styles.imagePreview} 
+            />
+          </View>
         )}
-      </TouchableOpacity>
-    </ScrollView>
+
+        <TouchableOpacity
+          style={[styles.submitButton, loading && { opacity: 0.7 }]}
+          onPress={submitReport}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.submitButtonText}>ENVIAR DENÚNCIA</Text>
+          )}
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
-
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: '#f5f5f5',
+  },
+  contentContainer: {
+    padding: 20,
+    paddingBottom: 60, // aumentei para garantir espaço para o botão
   },
   title: {
     fontSize: 24,
@@ -205,6 +213,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 10,
+    marginBottom: 20, // garante visibilidade final
   },
   submitButtonText: {
     color: '#fff',
@@ -217,26 +226,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 15,
   },
-  imageRemoveButton: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    backgroundColor: 'rgba(255,0,0,0.7)',
-    borderRadius: 15,
-    width: 30,
-    height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   imageContainer: {
     marginBottom: 15,
     position: 'relative',
-  },
-  characterCount: {
-    textAlign: 'right',
-    color: '#666',
-    marginBottom: 15,
-    fontSize: 12,
   },
 });
 

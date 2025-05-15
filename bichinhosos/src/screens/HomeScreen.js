@@ -1,4 +1,3 @@
-// HomeScreen.js
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -14,6 +13,7 @@ import {
 } from 'react-native';
 import { reportService } from '../services/database';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const HomeScreen = ({ navigation, route }) => {
   const [reports, setReports] = useState([]);
@@ -24,6 +24,7 @@ const HomeScreen = ({ navigation, route }) => {
   const [activeTab, setActiveTab] = useState('all');
   const [filter, setFilter] = useState('all');
   const userId = route.params?.userId;
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     loadReports();
@@ -94,13 +95,12 @@ const HomeScreen = ({ navigation, route }) => {
           <MaterialIcons name="filter-list" size={26} color="#fff" />
         </TouchableOpacity>
         <TouchableOpacity 
-      onPress={() => navigation.navigate('Profile', { userId })}
-      style={{ marginLeft: 15 }}
-    >
-      <MaterialIcons name="account-circle" size={26} color="#fff" />
-    </TouchableOpacity>
-  </View>
-  
+          onPress={() => navigation.navigate('Profile', { userId })}
+          style={{ marginLeft: 15 }}
+        >
+          <MaterialIcons name="account-circle" size={26} color="#fff" />
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.tabContainer}>
         {['all', 'my'].map(tab => (
@@ -136,6 +136,7 @@ const HomeScreen = ({ navigation, route }) => {
           data={filteredReports}
           renderItem={renderReport}
           keyExtractor={item => item.id.toString()}
+          contentContainerStyle={{ paddingBottom: 120 }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#27ae60']} />
           }
@@ -150,7 +151,7 @@ const HomeScreen = ({ navigation, route }) => {
       )}
 
       <TouchableOpacity
-        style={styles.addButton}
+        style={[styles.addButton, { bottom: 20 + insets.bottom }]}
         onPress={() => navigation.navigate('Report', { userId })}
       >
         <MaterialIcons name="add" size={28} color="#fff" />
@@ -192,7 +193,6 @@ const HomeScreen = ({ navigation, route }) => {
     </View>
   );
 };
-
 
 
 

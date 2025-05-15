@@ -38,7 +38,8 @@
     "react-native-screens": "~4.10.0",
     "react-native-vector-icons": "^10.2.0",
     "streamifier": "^0.1.1",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "expo-file-system": "~18.1.10"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
