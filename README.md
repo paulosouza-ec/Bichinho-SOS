@@ -1,4 +1,4 @@
-Bichinho-SOS é um aplicativo móvel desenvolvido em React Native com um backend em Node.js/Express, projetado para ser uma plataforma colaborativa onde os usuários podem registrar, visualizar e interagir com denúncias sobre animais em situações de risco, como abandono, maus-tratos ou que necessitem de resgate.
+Bichinho-SOS  (AINDA EM DESENVOLVIMENTO !! ) é um aplicativo móvel desenvolvido em React Native com um backend em Node.js/Express, projetado para ser uma plataforma colaborativa onde os usuários podem registrar, visualizar e interagir com denúncias sobre animais em situações de risco, como abandono, maus-tratos ou que necessitem de resgate.
 
 O objetivo é centralizar informações e engajar a comunidade na proteção dos animais.
 
