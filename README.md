@@ -2,7 +2,7 @@ Bichinho-SOS  (AINDA EM DESENVOLVIMENTO !! ) é um aplicativo móvel desenvolvid
 
 O objetivo é centralizar informações e engajar a comunidade na proteção dos animais.
 
-✨ Principais Funcionalidades
+✨ Principais Funcionalidades (Já implementadas)
 - 
 👤 Autenticação e Perfil de Usuário
 Cadastro e Login: Sistema completo de autenticação para que os usuários possam criar e acessar suas contas de forma segura. O cadastro inclui campos como nome, e-mail, telefone e um nickname único.
