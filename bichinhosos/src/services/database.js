@@ -21,6 +21,34 @@ export const authService = {
     }
   },
 
+  forgotPassword: async (email) => {
+    try {
+      const response = await api.post('/auth/forgot-password', { email });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Erro ao solicitar redefinição');
+    }
+  },
+
+
+  resetPassword: async ({ email, code, newPassword }) => {
+    try {
+      const response = await api.post('/auth/reset-password', { email, code, newPassword });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Erro ao redefinir senha');
+    }
+  },
+
+  verifyResetCode: async ({ email, code }) => {
+    try {
+      const response = await api.post('/auth/verify-reset-code', { email, code });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Erro ao verificar código');
+    }
+  },
+
   checkNickname: async (nickname) => {
     try {
       const response = await api.post('/auth/check-nickname', { nickname });

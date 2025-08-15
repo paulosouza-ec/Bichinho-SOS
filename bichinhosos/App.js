@@ -8,7 +8,9 @@ import HomeScreen from './src/screens/HomeScreen';
 import ReportScreen from './src/screens/ReportScreen';
 import ReportDetailScreen from './src/screens/ReportDetailScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
-import AgencyHomeScreen from './src/screens/AgencyHomeScreen'; // Importar a nova tela
+import AgencyHomeScreen from './src/screens/AgencyHomeScreen';
+import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
+import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
 
 const Stack = createStackNavigator();
 
@@ -58,6 +60,15 @@ export default function App() {
           component={ProfileScreen}
           options={{ title: 'Meu Perfil' }}
         />
+        <Stack.Screen 
+          name="ForgotPassword" 
+          component={ForgotPasswordScreen} 
+          options={{ title: 'Esqueci a Senha' }} />
+        <Stack.Screen 
+          name="ResetPassword" 
+          component={ResetPasswordScreen} 
+          options={{ title: 'Redefinir Senha' }} />
+
       </Stack.Navigator>
     </NavigationContainer>
   );
