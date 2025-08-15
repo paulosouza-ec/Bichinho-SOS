@@ -60,6 +60,18 @@ export const reportService = {
     }
   },
 
+  // --- FUNÇÃO ADICIONADA: PARA ATUALIZAR UMA DENÚNCIA ---
+  updateReport: async (reportId, reportData, userId) => {
+    try {
+      // Inclui o userId no corpo da requisição para verificação de autoria no backend
+      const payload = { ...reportData, userId };
+      const response = await api.put(`/api/reports/${reportId}`, payload);
+      return response.data.report;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Erro ao atualizar denúncia');
+    }
+  },
+
   getReports: async ({ userId, filter } = {}) => {
     try {
       const params = {};
@@ -185,7 +197,6 @@ export const reportService = {
     }
   },
 
-  // NOVA FUNÇÃO
   updateReportStatus: async (reportId, status, agencyId) => {
     try {
       const response = await api.put(`/api/reports/${reportId}/status`, { status, agencyId });

@@ -211,6 +211,39 @@ app.post('/api/reports', async (req, res) => {
   }
 });
 
+// --- ROTA ADICIONADA: PARA EDITAR UMA DENÚNCIA ---
+app.put('/api/reports/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, location, userId } = req.body;
+
+    // 1. Verifica se a denúncia existe e se o usuário é o dono
+    const reportCheck = await pool.query('SELECT user_id FROM reports WHERE id = $1', [id]);
+    
+    if (reportCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Denúncia não encontrada.' });
+    }
+    
+    if (reportCheck.rows[0].user_id !== userId) {
+      return res.status(403).json({ message: 'Ação não permitida. Você não é o autor desta denúncia.' });
+    }
+
+    // 2. Atualiza a denúncia no banco de dados
+    const updatedReport = await pool.query(
+      `UPDATE reports 
+       SET title = $1, description = $2, location = $3
+       WHERE id = $4 
+       RETURNING *`,
+      [title, description, location, id]
+    );
+
+    res.json({ report: updatedReport.rows[0] });
+  } catch (error) {
+    console.error('Erro ao editar denúncia:', error);
+    res.status(500).json({ message: 'Erro ao editar denúncia' });
+  }
+});
+
 
 app.get('/api/reports/:id', async (req, res) => {
   try {

@@ -15,7 +15,7 @@ import { MaterialIcons, FontAwesome, Ionicons } from '@expo/vector-icons';
 import { reportService } from '../services/database';
 import moment from 'moment'; 
 import 'moment/locale/pt-br';
-import { Video } from 'expo-av'; // Importar o componente de vídeo
+import { Video } from 'expo-av';
 
 moment.locale('pt-br');
 
@@ -43,6 +43,18 @@ const ReportDetailScreen = ({ route, navigation }) => {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Recarrega os dados da denúncia quando a tela volta a ter foco (após uma edição)
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      // Verifica se há uma denúncia atualizada vinda da tela de edição
+      if (route.params?.updatedReport) {
+        setReport(route.params.updatedReport);
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, route.params?.updatedReport]);
 
   const loadData = async () => {
     try {
@@ -132,6 +144,11 @@ const ReportDetailScreen = ({ route, navigation }) => {
     } catch (error) {
       Alert.alert('Erro', error.message);
     }
+  };
+
+  // --- FUNÇÃO ADICIONADA: PARA NAVEGAR PARA A TELA DE EDIÇÃO ---
+  const handleNavigateToEdit = () => {
+    navigation.navigate('Report', { user, reportToEdit: report });
   };
 
   const renderComment = ({ item }) => (
@@ -230,7 +247,16 @@ const ReportDetailScreen = ({ route, navigation }) => {
                 <Ionicons name="arrow-back" size={24} color="#2c3e50" />
               </TouchableOpacity>
               <Text style={styles.title}>Detalhes da Denúncia</Text>
-              <View style={{ width: 24 }} />
+              
+              {/* --- BOTÃO DE EDITAR ADICIONADO --- */}
+              {/* Aparece apenas se o usuário logado for o autor da denúncia */}
+              {user && user.id === report.user_id ? (
+                <TouchableOpacity onPress={handleNavigateToEdit}>
+                  <MaterialIcons name="edit" size={24} color="#2c3e50" />
+                </TouchableOpacity>
+              ) : (
+                <View style={{ width: 24 }} /> // Espaço vazio para manter o alinhamento
+              )}
             </View>
             
             <View style={styles.reportContainer}>
@@ -253,7 +279,6 @@ const ReportDetailScreen = ({ route, navigation }) => {
               
               <Text style={styles.reportDescription}>{report.description}</Text>
               
-              {/* LÓGICA PARA EXIBIR FOTO OU VÍDEO */}
               {report.photo_uri && (
                 <View style={styles.mediaContainer}>
                   {report.media_type === 'video' ? (
@@ -386,7 +411,6 @@ const styles = StyleSheet.create({
   reportDescription: { fontSize: 15, color: '#555', marginVertical: 15, lineHeight: 22 },
   locationContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   reportLocation: { fontSize: 13, color: '#666', marginLeft: 5 },
-  // Estilos para a mídia (foto/vídeo)
   mediaContainer: {
     width: '100%',
     height: 250,
