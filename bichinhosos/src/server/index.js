@@ -3,12 +3,11 @@ const express = require('express');
 const { Pool } = require('pg');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const multer = require('multer');
+const path = require('path');
 
 const app = express();
 const port = process.env.PORT || 3000;
-
-const multer = require('multer');
-const path = require('path');
 
 // Configuração do PostgreSQL
 const pool = new Pool({
@@ -26,48 +25,31 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(bodyParser.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Rotas de autenticação
+// Rota de Registro Atualizada
 app.post('/auth/register', async (req, res) => {
   try {
-    const { name, email, password, phone, nickname, profile_pic } = req.body;
+    const { name, email, password, phone, nickname, profile_pic, user_type } = req.body;
     
-    // Verificação final do nickname
-    const nicknameCheck = await pool.query(
-      'SELECT id FROM users WHERE nickname ILIKE $1',
-      [nickname]
-    );
-    
+    const nicknameCheck = await pool.query('SELECT id FROM users WHERE nickname ILIKE $1', [nickname]);
     if (nicknameCheck.rows.length > 0) {
-      return res.status(400).json({ message: 'Nickname já em uso' });
+      return res.status(400).json({ message: 'Apelido já em uso' });
     }
 
-    // Verificação de email
-    const emailCheck = await pool.query(
-      'SELECT id FROM users WHERE email = $1',
-      [email]
-    );
-    
+    const emailCheck = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
     if (emailCheck.rows.length > 0) {
       return res.status(400).json({ message: 'Email já cadastrado' });
     }
 
-    // Inserção no banco
     const newUser = await pool.query(
-      `INSERT INTO users (name, email, password, phone, nickname, profile_pic) 
-       VALUES ($1, $2, $3, $4, $5, $6) 
-       RETURNING id, name, email, nickname, profile_pic`,
-      [
-        name, 
-        email, 
-        password, 
-        phone, 
-        nickname, 
-        profile_pic || null
-      ]
+      `INSERT INTO users (name, email, password, phone, nickname, profile_pic, user_type) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7) 
+       RETURNING id, name, email, nickname, profile_pic, user_type`,
+      [name, email, password, phone, nickname, profile_pic || null, user_type || 'common']
     );
     
-    res.json({ user: newUser.rows[0] });
+    res.status(201).json({ user: newUser.rows[0] });
     
   } catch (error) {
     console.error('Erro no registro:', error);
@@ -75,6 +57,7 @@ app.post('/auth/register', async (req, res) => {
   }
 });
 
+// Rota de Login Atualizada
 app.post('/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -98,7 +81,72 @@ app.post('/auth/login', async (req, res) => {
   }
 });
 
-// Rotas de denúncias
+// Rota para buscar denúncias (agora inclui o status)
+app.get('/api/reports', async (req, res) => {
+  try {
+    const { userId, filter } = req.query;
+    
+    let query = `
+      SELECT r.*, u.name as user_name 
+      FROM reports r
+      LEFT JOIN users u ON r.user_id = u.id
+    `;
+    
+    const params = [];
+    let paramCount = 0;
+
+    if (userId && !isNaN(userId)) {
+      query += ` WHERE r.user_id = $${++paramCount}`;
+      params.push(parseInt(userId));
+    } else if (filter === 'anonymous') {
+      query += ' WHERE r.is_anonymous = true';
+    } else if (filter === 'identified') {
+      query += ' WHERE r.is_anonymous = false';
+    }
+    
+    query += ' ORDER BY r.created_at DESC';
+    
+    const reports = await pool.query(query, params);
+    res.json({ reports: reports.rows });
+  } catch (error) {
+    console.error('Erro ao buscar denúncias:', error);
+    res.status(500).json({ message: 'Erro ao buscar denúncias' });
+  }
+});
+
+// NOVA ROTA: Para órgãos atualizarem o status de uma denúncia
+app.put('/api/reports/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, agencyId } = req.body;
+
+    const validStatuses = ['pending', 'seen', 'in_progress', 'resolved'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ message: 'Status inválido' });
+    }
+
+    const agencyCheck = await pool.query('SELECT user_type FROM users WHERE id = $1', [agencyId]);
+    if (agencyCheck.rows.length === 0 || agencyCheck.rows[0].user_type !== 'agency') {
+      return res.status(403).json({ message: 'Ação não permitida para este usuário' });
+    }
+
+    const updatedReport = await pool.query(
+      'UPDATE reports SET status = $1 WHERE id = $2 RETURNING *',
+      [status, id]
+    );
+
+    if (updatedReport.rows.length === 0) {
+      return res.status(404).json({ message: 'Denúncia não encontrada' });
+    }
+
+    res.json({ report: updatedReport.rows[0] });
+  } catch (error) {
+    console.error('Erro ao atualizar status:', error);
+    res.status(500).json({ message: 'Erro ao atualizar status da denúncia' });
+  }
+});
+
+// Rota para criar denúncia
 app.post('/api/reports', async (req, res) => {
   try {
     const { userId, title, description, location, isAnonymous, photo_uri } = req.body;
@@ -109,13 +157,12 @@ app.post('/api/reports', async (req, res) => {
       [isAnonymous ? null : userId, title, description, location || null, isAnonymous, photo_uri || null]
     );
     
-    res.json({ report: newReport.rows[0] });
+    res.status(201).json({ report: newReport.rows[0] });
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao criar denúncia' });
+    console.error('Erro ao criar denúncia:', error);
+    res.status(500).json({ message: 'Erro ao criar denúncia' });
   }
 });
-
-
 
 app.get('/api/reports/:id', async (req, res) => {
   try {
@@ -136,65 +183,24 @@ app.get('/api/reports/:id', async (req, res) => {
   }
 });
 
-// Rota única para todas as denúncias com filtros
-app.get('/api/reports', async (req, res) => {
-  try {
-    const { userId, filter } = req.query;
-    
-    let query = `
-      SELECT r.*, u.name as user_name 
-      FROM reports r
-      LEFT JOIN users u ON r.user_id = u.id
-    `;
-    
-    const params = [];
-    let paramCount = 0;
-
-    // Se tiver userId, filtra por usuário
-    if (userId && !isNaN(userId)) {
-      query += ` WHERE r.user_id = $${++paramCount}`;
-      params.push(parseInt(userId));
-    } 
-    // Se não tiver userId, aplica filtros públicos
-    else if (filter === 'anonymous') {
-      query += ' WHERE r.is_anonymous = true';
-    } else if (filter === 'identified') {
-      query += ' WHERE r.is_anonymous = false';
-    }
-    
-    query += ' ORDER BY r.created_at DESC';
-    
-    const reports = await pool.query(query, params);
-    res.json({ reports: reports.rows });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Erro ao buscar denúncias' });
-  }
-});
-
-
-
 // Rota para curtir/descurtir uma denúncia
 app.post('/api/reports/:id/like', async (req, res) => {
   try {
     const { id } = req.params;
     const { userId } = req.body;
 
-    // Verifica se o usuário já curtiu esta denúncia
     const existingLike = await pool.query(
       'SELECT * FROM likes WHERE report_id = $1 AND user_id = $2',
       [id, userId]
     );
 
     if (existingLike.rows.length > 0) {
-      // Remove o like
       await pool.query(
         'DELETE FROM likes WHERE id = $1',
         [existingLike.rows[0].id]
       );
       res.json({ liked: false });
     } else {
-      // Adiciona o like
       await pool.query(
         'INSERT INTO likes (report_id, user_id) VALUES ($1, $2)',
         [id, userId]
@@ -219,13 +225,12 @@ app.post('/api/reports/:id/comments', async (req, res) => {
       [id, userId, content, parentId || null]
     );
 
-    // Busca os dados do usuário incluindo a foto
     const user = await pool.query(
       'SELECT id, name, profile_pic FROM users WHERE id = $1',
       [userId]
     );
 
-    res.json({ 
+    res.status(201).json({ 
       comment: {
         ...newComment.rows[0],
         user: user.rows[0],
@@ -295,16 +300,13 @@ app.get('/api/reports/:id/likes/count', async (req, res) => {
   }
 });
 
-
-//Procurar nick do usuario
-
+// Rota para verificar apelido
 app.post('/auth/check-nickname', async (req, res) => {
   try {
     const { nickname } = req.body;
-    console.log('Verificando nickname:', nickname); // Log para depuração
     
     if (!nickname || nickname.length < 3) {
-      return res.json({ available: false, message: 'Nickname muito curto' });
+      return res.json({ available: false, message: 'Apelido muito curto' });
     }
 
     const result = await pool.query(
@@ -317,18 +319,17 @@ app.post('/auth/check-nickname', async (req, res) => {
       valid: nickname.length >= 3
     });
   } catch (error) {
-    console.error('Erro ao verificar nickname:', error);
+    console.error('Erro ao verificar apelido:', error);
     res.status(500).json({ message: 'Erro no servidor' });
   }
 });
 
- // Rota de edicao de comentario do user
+// Rota de edição de comentário
 app.put('/api/reports/:reportId/comments/:commentId', async (req, res) => {
   try {
-    const { commentId, reportId } = req.params;
+    const { commentId } = req.params;
     const { content, userId } = req.body;
 
-    // Verifica se o comentário pertence ao usuário
     const commentCheck = await pool.query(
       'SELECT * FROM comments WHERE id = $1 AND user_id = $2',
       [commentId, userId]
@@ -353,10 +354,9 @@ app.put('/api/reports/:reportId/comments/:commentId', async (req, res) => {
 // Rota para excluir comentário
 app.delete('/api/reports/:reportId/comments/:commentId', async (req, res) => {
   try {
-    const { commentId, reportId } = req.params;
+    const { commentId } = req.params;
     const { userId } = req.body;
 
-    // Verifica se o comentário pertence ao usuário
     const commentCheck = await pool.query(
       'SELECT * FROM comments WHERE id = $1 AND user_id = $2',
       [commentId, userId]
@@ -367,14 +367,14 @@ app.delete('/api/reports/:reportId/comments/:commentId', async (req, res) => {
     }
 
     await pool.query('DELETE FROM comments WHERE id = $1', [commentId]);
-    res.json({ success: true });
+    res.json({ success: true, message: 'Comentário excluído com sucesso' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Erro ao excluir comentário' });
   }
 });
 
-
+// Rota para buscar perfil
 app.get('/users/:id/profile', async (req, res) => {
   try {
     const { id } = req.params;
@@ -395,7 +395,7 @@ app.get('/users/:id/profile', async (req, res) => {
   }
 });
 
-// Rota para atualizar perfil do usuário
+// Rota para atualizar perfil
 app.put('/users/:id/profile', async (req, res) => {
   try {
     const { id } = req.params;
@@ -436,7 +436,6 @@ app.delete('/api/reports/:id', async (req, res) => {
     const { id } = req.params;
     const { userId } = req.body;
     
-    // Verifica se a denúncia pertence ao usuário
     const reportCheck = await pool.query(
       'SELECT * FROM reports WHERE id = $1 AND user_id = $2',
       [id, userId]
@@ -446,14 +445,11 @@ app.delete('/api/reports/:id', async (req, res) => {
       return res.status(403).json({ message: 'Você não pode excluir esta denúncia' });
     }
     
-    // Primeiro exclui os comentários e likes associados
     await pool.query('DELETE FROM comments WHERE report_id = $1', [id]);
     await pool.query('DELETE FROM likes WHERE report_id = $1', [id]);
-    
-    // Depois exclui a denúncia
     await pool.query('DELETE FROM reports WHERE id = $1', [id]);
     
-    res.json({ success: true });
+    res.json({ success: true, message: 'Denúncia excluída com sucesso' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Erro ao excluir denúncia' });
@@ -465,13 +461,11 @@ app.get('/users/:id/stats', async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Conta denúncias do usuário
     const reportsCount = await pool.query(
       'SELECT COUNT(*) FROM reports WHERE user_id = $1',
       [id]
     );
     
-    // Conta curtidas recebidas nas denúncias do usuário
     const likesReceived = await pool.query(
       `SELECT COUNT(*) FROM likes l
        JOIN reports r ON l.report_id = r.id
@@ -479,7 +473,6 @@ app.get('/users/:id/stats', async (req, res) => {
       [id]
     );
     
-    // Conta comentários feitos pelo usuário
     const commentsCount = await pool.query(
       'SELECT COUNT(*) FROM comments WHERE user_id = $1',
       [id]
@@ -498,10 +491,10 @@ app.get('/users/:id/stats', async (req, res) => {
   }
 });
 
-
+// Configuração do Multer para upload de imagens
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/'); // Pasta onde as imagens serão salvas
+    cb(null, 'uploads/');
   },
   filename: (req, file, cb) => {
     cb(null, `report-${Date.now()}${path.extname(file.originalname)}`);
@@ -510,7 +503,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// Rota para upload:
+// Rota para upload
 app.post('/api/upload', upload.single('image'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhuma imagem enviada' });
@@ -518,11 +511,6 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
   const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
   res.json({ imageUrl });
 });
-
-// Servir arquivos estáticos:
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-
 
 // Inicia o servidor
 app.listen(port, () => {

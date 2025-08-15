@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,14 @@ import {
 import { reportService } from '../services/database';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+
+const statusMap = {
+  pending: { text: 'Pendente', color: '#f39c12' },
+  seen: { text: 'Visualizado', color: '#3498db' },
+  in_progress: { text: 'Em Andamento', color: '#9b59b6' },
+  resolved: { text: 'Resolvido', color: '#2ecc71' },
+};
 
 const HomeScreen = ({ navigation, route }) => {
   const [reports, setReports] = useState([]);
@@ -23,17 +31,13 @@ const HomeScreen = ({ navigation, route }) => {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
   const [filter, setFilter] = useState('all');
-  const userId = route.params?.userId;
+  const { user } = route.params;
   const insets = useSafeAreaInsets();
-
-  useEffect(() => {
-    loadReports();
-  }, [activeTab, filter]);
 
   const loadReports = async () => {
     try {
       setLoading(true);
-      const params = activeTab === 'my' ? { userId } : { filter };
+      const params = activeTab === 'my' ? { userId: user.id } : { filter };
       const reportsData = await reportService.getReports(params);
       setReports(reportsData);
     } catch (error) {
@@ -44,6 +48,12 @@ const HomeScreen = ({ navigation, route }) => {
       setRefreshing(false);
     }
   };
+  
+  useFocusEffect(
+    useCallback(() => {
+      loadReports();
+    }, [activeTab, filter])
+  );
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -51,18 +61,20 @@ const HomeScreen = ({ navigation, route }) => {
   };
 
   const filteredReports = reports.filter(report =>
-    report.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    report.description.toLowerCase().includes(searchQuery.toLowerCase())
+    (report.title && report.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (report.description && report.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const renderReport = ({ item }) => (
     <TouchableOpacity
       style={styles.reportItem}
-      onPress={() => navigation.navigate('ReportDetail', { report: item, userId })}
+      onPress={() => navigation.navigate('ReportDetail', { report: item, user: user })}
     >
       <View style={styles.reportHeader}>
         <Text style={styles.reportTitle}>{item.title}</Text>
-        <Text style={styles.reportDate}>{new Date(item.created_at).toLocaleDateString('pt-BR')}</Text>
+        <View style={[styles.statusBadge, { backgroundColor: statusMap[item.status]?.color || '#7f8c8d' }]}>
+          <Text style={styles.statusBadgeText}>{statusMap[item.status]?.text || 'Desconhecido'}</Text>
+        </View>
       </View>
 
       <Text style={styles.reportDescription}>
@@ -80,9 +92,7 @@ const HomeScreen = ({ navigation, route }) => {
         <Text style={[styles.badge, item.is_anonymous ? styles.anonymous : styles.identified]}>
           {item.is_anonymous ? 'Anônima' : 'Identificada'}
         </Text>
-        {!item.is_anonymous && item.user_name && activeTab === 'all' && (
-          <Text style={styles.authorText}>Por: {item.user_name}</Text>
-        )}
+        <Text style={styles.reportDate}>{new Date(item.created_at).toLocaleDateString('pt-BR')}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -91,15 +101,17 @@ const HomeScreen = ({ navigation, route }) => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>BichinhoSOS</Text>
-        <TouchableOpacity onPress={() => setFilterModalVisible(true)}>
-          <MaterialIcons name="filter-list" size={26} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity 
-          onPress={() => navigation.navigate('Profile', { userId })}
-          style={{ marginLeft: 15 }}
-        >
-          <MaterialIcons name="account-circle" size={26} color="#fff" />
-        </TouchableOpacity>
+        <View style={styles.headerIcons}>
+          <TouchableOpacity onPress={() => setFilterModalVisible(true)}>
+            <MaterialIcons name="filter-list" size={26} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('Profile', { userId: user.id })}
+            style={{ marginLeft: 15 }}
+          >
+            <MaterialIcons name="account-circle" size={26} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.tabContainer}>
@@ -127,7 +139,7 @@ const HomeScreen = ({ navigation, route }) => {
         <MaterialIcons name="search" size={22} color="#999" />
       </View>
 
-      {loading ? (
+      {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#27ae60" />
         </View>
@@ -136,7 +148,7 @@ const HomeScreen = ({ navigation, route }) => {
           data={filteredReports}
           renderItem={renderReport}
           keyExtractor={item => item.id.toString()}
-          contentContainerStyle={{ paddingBottom: 120 }}
+          contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 20 }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#27ae60']} />
           }
@@ -152,7 +164,7 @@ const HomeScreen = ({ navigation, route }) => {
 
       <TouchableOpacity
         style={[styles.addButton, { bottom: 20 + insets.bottom }]}
-        onPress={() => navigation.navigate('Report', { userId })}
+        onPress={() => navigation.navigate('Report', { userId: user.id })}
       >
         <MaterialIcons name="add" size={28} color="#fff" />
       </TouchableOpacity>
@@ -194,8 +206,6 @@ const HomeScreen = ({ navigation, route }) => {
   );
 };
 
-
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f9fa' },
   header: {
@@ -208,6 +218,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
+  headerIcons: { flexDirection: 'row' },
   tabContainer: {
     flexDirection: 'row',
     marginHorizontal: 20,
@@ -237,7 +248,6 @@ const styles = StyleSheet.create({
   },
   reportItem: {
     backgroundColor: '#fff',
-    marginHorizontal: 20,
     marginBottom: 15,
     padding: 15,
     borderRadius: 12,
@@ -247,13 +257,13 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-  reportHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  reportTitle: { fontSize: 16, fontWeight: 'bold', color: '#2c3e50' },
+  reportHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6, alignItems: 'center' },
+  reportTitle: { fontSize: 16, fontWeight: 'bold', color: '#2c3e50', flex: 1, marginRight: 10 },
   reportDate: { fontSize: 12, color: '#7f8c8d' },
   reportDescription: { fontSize: 14, color: '#444', marginVertical: 6 },
   locationContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   reportLocation: { marginLeft: 5, fontSize: 13, color: '#7f8c8d' },
-  reportFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  reportFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },
   badge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -263,7 +273,16 @@ const styles = StyleSheet.create({
   },
   anonymous: { backgroundColor: '#f0f0f0', color: '#888' },
   identified: { backgroundColor: '#e9fbe9', color: '#27ae60' },
-  authorText: { fontSize: 12, fontStyle: 'italic', color: '#888' },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  statusBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
   addButton: {
     position: 'absolute',
     right: 25,
@@ -277,7 +296,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, marginTop: 50 },
   emptyText: { color: '#888', fontSize: 16, textAlign: 'center' },
   modalContainer: {
     flex: 1,
@@ -298,9 +317,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 15,
   },
-  filterOption: { paddingVertical: 12 },
-  filterOptionSelected: { backgroundColor: '#f0f0f0' },
-  filterOptionText: { fontSize: 16, color: '#2c3e50' },
+  filterOption: { paddingVertical: 12, borderRadius: 8, paddingHorizontal: 10 },
+  filterOptionSelected: { backgroundColor: '#e9fbe9' },
+  filterOptionText: { fontSize: 16, color: '#2c3e50', textAlign: 'center' },
   closeButton: {
     marginTop: 20,
     backgroundColor: '#27ae60',
@@ -309,12 +328,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   closeButtonText: { color: '#fff', fontWeight: 'bold' },
-
-
-  headerIcons: {
-  flexDirection: 'row',
-},
-
 });
 
 export default HomeScreen;

@@ -13,8 +13,7 @@ import {
   Alert
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import Icon from 'react-native-vector-icons/FontAwesome';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, FontAwesome } from '@expo/vector-icons';
 import { authService } from '../services/database';
 
 const DEFAULT_PROFILE_IMAGE = { uri: 'https://cdn-icons-png.flaticon.com/512/1946/1946429.png' };
@@ -28,12 +27,13 @@ const RegisterScreen = ({ navigation }) => {
   const [profilePic, setProfilePic] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [userType, setUserType] = useState('common'); // 'common' ou 'agency'
 
   const pickImage = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permissão necessária', 'Precisamos acessar sua galeria para selecionar uma foto');
+        Alert.alert('Permissão necessária', 'Precisamos de acesso à sua galeria para selecionar uma foto.');
         return;
       }
 
@@ -49,18 +49,18 @@ const RegisterScreen = ({ navigation }) => {
       }
     } catch (error) {
       console.error('Erro ao selecionar imagem:', error);
-      Alert.alert('Erro', 'Não foi possível selecionar a imagem');
+      Alert.alert('Erro', 'Não foi possível selecionar a imagem.');
     }
   };
 
   const handleRegister = async () => {
     if (!name || !email || !password || !phone || !nickname) {
-      Alert.alert('Erro', 'Preencha todos os campos obrigatórios');
+      Alert.alert('Erro', 'Por favor, preencha todos os campos obrigatórios.');
       return;
     }
 
     if (nickname.length < 3) {
-      Alert.alert('Erro', 'Nickname deve ter pelo menos 3 caracteres');
+      Alert.alert('Erro', 'O apelido deve ter pelo menos 3 caracteres.');
       return;
     }
 
@@ -68,7 +68,7 @@ const RegisterScreen = ({ navigation }) => {
     try {
       const nicknameResponse = await authService.checkNickname(nickname);
       if (!nicknameResponse.available) {
-        Alert.alert('Erro', 'Este nickname já está em uso');
+        Alert.alert('Erro', 'Este apelido já está em uso. Por favor, escolha outro.');
         setLoading(false);
         return;
       }
@@ -79,7 +79,8 @@ const RegisterScreen = ({ navigation }) => {
         password,
         phone,
         nickname,
-        profile_pic: profilePic
+        profile_pic: profilePic,
+        user_type: userType
       });
       
       Alert.alert('Sucesso', 'Cadastro realizado com sucesso!', [
@@ -88,7 +89,7 @@ const RegisterScreen = ({ navigation }) => {
       
     } catch (error) {
       console.error('Erro no cadastro:', error);
-      Alert.alert('Erro', error.message || 'Falha ao cadastrar usuário');
+      Alert.alert('Erro', error.message || 'Falha ao cadastrar usuário.');
     } finally {
       setLoading(false);
     }
@@ -99,8 +100,7 @@ const RegisterScreen = ({ navigation }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* Logo e Título */}
+      <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <Image
             source={require('../assets/pawprint.png')}
@@ -110,11 +110,31 @@ const RegisterScreen = ({ navigation }) => {
           <Text style={styles.appSubtitle}>Protegendo os animais juntos</Text>
         </View>
 
-        {/* Formulário */}
         <View style={styles.formContainer}>
           <Text style={styles.welcomeText}>Crie sua conta</Text>
           
-          {/* Foto de perfil */}
+          <View style={styles.userTypeContainer}>
+            <Text style={styles.inputLabel}>Eu sou:</Text>
+            <View style={styles.userTypeButtons}>
+              <TouchableOpacity
+                style={[styles.userTypeButton, userType === 'common' && styles.userTypeButtonActive]}
+                onPress={() => setUserType('common')}
+              >
+                <Text style={[styles.userTypeButtonText, userType === 'common' && styles.userTypeButtonTextActive]}>
+                  Cidadão
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.userTypeButton, userType === 'agency' && styles.userTypeButtonActive]}
+                onPress={() => setUserType('agency')}
+              >
+                <Text style={[styles.userTypeButtonText, userType === 'agency' && styles.userTypeButtonTextActive]}>
+                  Órgão/ONG
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          
           <View style={styles.profilePicContainer}>
             <TouchableOpacity onPress={pickImage}>
               <Image
@@ -130,7 +150,6 @@ const RegisterScreen = ({ navigation }) => {
             </Text>
           </View>
 
-          {/* Campos do formulário */}
           <View style={styles.inputWrapper}>
             <Text style={styles.inputLabel}>Nome completo</Text>
             <View style={styles.inputContainer}>
@@ -174,7 +193,7 @@ const RegisterScreen = ({ navigation }) => {
                 style={styles.eyeIcon} 
                 onPress={() => setShowPassword(!showPassword)}
               >
-                <Icon 
+                <FontAwesome 
                   name={showPassword ? 'eye-slash' : 'eye'} 
                   size={20} 
                   color="#999" 
@@ -199,7 +218,7 @@ const RegisterScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.inputWrapper}>
-            <Text style={styles.inputLabel}>Nickname</Text>
+            <Text style={styles.inputLabel}>Apelido</Text>
             <View style={styles.inputContainer}>
               <TextInput
                 style={styles.input}
@@ -212,7 +231,6 @@ const RegisterScreen = ({ navigation }) => {
             </View>
           </View>
 
-          {/* Botão de Cadastro */}
           <TouchableOpacity 
             style={styles.registerButton}
             onPress={handleRegister}
@@ -225,14 +243,12 @@ const RegisterScreen = ({ navigation }) => {
             )}
           </TouchableOpacity>
 
-          {/* Divisor */}
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
             <Text style={styles.dividerText}>ou</Text>
             <View style={styles.dividerLine} />
           </View>
 
-          {/* Link para Login */}
           <TouchableOpacity 
             style={styles.loginButton}
             onPress={() => navigation.navigate('Login')}
@@ -253,6 +269,7 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
+    paddingVertical: 20,
   },
   header: {
     alignItems: 'center',
@@ -291,6 +308,34 @@ const styles = StyleSheet.create({
     color: '#2c3e50',
     marginBottom: 20,
     textAlign: 'center',
+  },
+  userTypeContainer: {
+    marginBottom: 20,
+  },
+  userTypeButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  userTypeButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#dfe6e9',
+    borderRadius: 10,
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  userTypeButtonActive: {
+    backgroundColor: '#27ae60',
+    borderColor: '#27ae60',
+  },
+  userTypeButtonText: {
+    color: '#2c3e50',
+    fontWeight: '600',
+  },
+  userTypeButtonTextActive: {
+    color: '#fff',
   },
   profilePicContainer: {
     alignItems: 'center',

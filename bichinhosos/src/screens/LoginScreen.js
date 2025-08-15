@@ -9,7 +9,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  ScrollView
+  ScrollView,
+  Alert
 } from 'react-native';
 import { authService } from '../services/database';
 import Icon from 'react-native-vector-icons/FontAwesome';
@@ -22,7 +23,7 @@ const LoginScreen = ({ navigation }) => {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      alert('Erro', 'Preencha todos os campos');
+      Alert.alert('Erro', 'Por favor, preencha todos os campos.');
       return;
     }
   
@@ -30,12 +31,18 @@ const LoginScreen = ({ navigation }) => {
     try {
       const user = await authService.loginUser(email, password);
       if (user) {
-        navigation.navigate('Home', { userId: user.id });
+        // Lógica de Redirecionamento
+        if (user.user_type === 'agency') {
+          navigation.replace('AgencyHome', { user: user });
+        } else {
+          navigation.replace('Home', { user: user });
+        }
       } else {
-        alert('Erro', 'Credenciais inválidas');
+        // A API já deve retornar um erro 401, que será pego no catch
+        Alert.alert('Erro', 'Credenciais inválidas.');
       }
     } catch (error) {
-      alert('Erro', error.message || 'Falha ao fazer login');
+      Alert.alert('Erro', error.message || 'Falha ao fazer login. Verifique seu email e senha.');
     } finally {
       setLoading(false);
     }
@@ -46,8 +53,7 @@ const LoginScreen = ({ navigation }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* Logo e Título */}
+      <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <Image
             source={require('../assets/pawprint.png')}
@@ -57,11 +63,9 @@ const LoginScreen = ({ navigation }) => {
           <Text style={styles.appSubtitle}>Protegendo os animais juntos</Text>
         </View>
 
-        {/* Formulário */}
         <View style={styles.formContainer}>
           <Text style={styles.welcomeText}>Bem-vindo de volta!</Text>
           
-          {/* Campo Email */}
           <View style={styles.inputWrapper}>
             <Text style={styles.inputLabel}>Email</Text>
             <View style={styles.inputContainer}>
@@ -77,7 +81,6 @@ const LoginScreen = ({ navigation }) => {
             </View>
           </View>
 
-          {/* Campo Senha */}
           <View style={styles.inputWrapper}>
             <Text style={styles.inputLabel}>Senha</Text>
             <View style={styles.inputContainer}>
@@ -105,7 +108,6 @@ const LoginScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
-          {/* Botão de Login */}
           <TouchableOpacity 
             style={styles.loginButton}
             onPress={handleLogin}
@@ -118,14 +120,12 @@ const LoginScreen = ({ navigation }) => {
             )}
           </TouchableOpacity>
 
-          {/* Divisor */}
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
             <Text style={styles.dividerText}>ou</Text>
             <View style={styles.dividerLine} />
           </View>
 
-          {/* Botão de Cadastro */}
           <TouchableOpacity 
             style={styles.registerButton}
             onPress={() => navigation.navigate('Register')}
