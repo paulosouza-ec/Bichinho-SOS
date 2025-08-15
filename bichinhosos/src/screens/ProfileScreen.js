@@ -96,7 +96,6 @@ const ProfileScreen = ({ navigation, route }) => {
     }
   };
 
-  // --- NOVA FUNÇÃO DE LOGOUT ---
   const handleLogout = () => {
     Alert.alert(
       "Sair",
@@ -109,7 +108,6 @@ const ProfileScreen = ({ navigation, route }) => {
         { 
           text: "Sair", 
           onPress: () => {
-            // Reseta a navegação para a tela de Login
             navigation.reset({
               index: 0,
               routes: [{ name: 'Login' }],
@@ -138,11 +136,12 @@ const ProfileScreen = ({ navigation, route }) => {
         {item.description.substring(0, 100)}...
       </Text>
       
+      {/* --- LINHA CORRIGIDA --- */}
       <TouchableOpacity
         style={styles.viewButton}
         onPress={() => navigation.navigate('ReportDetail', { 
           report: item, 
-          userId 
+          user: user // Enviando o objeto 'user' completo
         })}
       >
         <Text style={styles.viewButtonText}>Ver detalhes</Text>
@@ -257,7 +256,6 @@ const ProfileScreen = ({ navigation, route }) => {
         )}
       </View>
 
-      {/* --- BOTÃO DE LOGOUT ADICIONADO --- */}
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <MaterialIcons name="logout" size={20} color="#c0392b" />
         <Text style={styles.logoutButtonText}>Sair da Conta</Text>
@@ -438,7 +436,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
-  // --- NOVOS ESTILOS PARA LOGOUT ---
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
