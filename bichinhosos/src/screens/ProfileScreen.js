@@ -38,16 +38,13 @@ const ProfileScreen = ({ navigation, route }) => {
     try {
       setLoading(true);
       
-      // Carrega dados do usuário
       const userData = await authService.getUserProfile(userId);
       setUser(userData);
       setBio(userData.bio || '');
       
-      // Carrega denúncias do usuário
       const reportsData = await reportService.getUserReports(userId);
       setReports(reportsData);
       
-      // Carrega estatísticas
       const statsData = await reportService.getUserStats(userId);
       setStats(statsData);
       
@@ -99,6 +96,31 @@ const ProfileScreen = ({ navigation, route }) => {
     }
   };
 
+  // --- NOVA FUNÇÃO DE LOGOUT ---
+  const handleLogout = () => {
+    Alert.alert(
+      "Sair",
+      "Você tem certeza que deseja sair da sua conta?",
+      [
+        {
+          text: "Cancelar",
+          style: "cancel"
+        },
+        { 
+          text: "Sair", 
+          onPress: () => {
+            // Reseta a navegação para a tela de Login
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Login' }],
+            });
+          },
+          style: 'destructive'
+        }
+      ]
+    );
+  };
+
   const renderReport = ({ item }) => (
     <View style={styles.reportItem}>
       <View style={styles.reportHeader}>
@@ -137,8 +159,16 @@ const ProfileScreen = ({ navigation, route }) => {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Seção do perfil */}
+    <ScrollView 
+      style={styles.container}
+      refreshControl={
+        <RefreshControl 
+          refreshing={refreshing} 
+          onRefresh={handleRefresh}
+          colors={['#27ae60']}
+        />
+      }
+    >
       <View style={styles.profileSection}>
         <Image
           source={{ uri: user?.profile_pic || 'https://cdn-icons-png.flaticon.com/512/1946/1946429.png' }}
@@ -163,7 +193,7 @@ const ProfileScreen = ({ navigation, route }) => {
                 style={styles.cancelButton}
                 onPress={() => setIsEditingBio(false)}
               >
-                <Text style={styles.buttonText}>Cancelar</Text>
+                <Text>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.saveButton}
@@ -187,7 +217,6 @@ const ProfileScreen = ({ navigation, route }) => {
           </View>
         )}
         
-        {/* Estatísticas */}
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
             <Text style={styles.statNumber}>{stats.reportsCount}</Text>
@@ -204,7 +233,6 @@ const ProfileScreen = ({ navigation, route }) => {
         </View>
       </View>
       
-      {/* Seção de denúncias */}
       <View style={styles.reportsSection}>
         <Text style={styles.sectionTitle}>Minhas Denúncias</Text>
         
@@ -214,13 +242,6 @@ const ProfileScreen = ({ navigation, route }) => {
             renderItem={renderReport}
             keyExtractor={item => item.id.toString()}
             scrollEnabled={false}
-            refreshControl={
-              <RefreshControl 
-                refreshing={refreshing} 
-                onRefresh={handleRefresh}
-                colors={['#27ae60']}
-              />
-            }
           />
         ) : (
           <View style={styles.emptyContainer}>
@@ -228,13 +249,19 @@ const ProfileScreen = ({ navigation, route }) => {
             <Text style={styles.emptyText}>Nenhuma denúncia encontrada</Text>
             <TouchableOpacity
               style={styles.createButton}
-              onPress={() => navigation.navigate('Report', { userId })}
+              onPress={() => navigation.navigate('Report', { user: user })}
             >
               <Text style={styles.createButtonText}>Criar primeira denúncia</Text>
             </TouchableOpacity>
           </View>
         )}
       </View>
+
+      {/* --- BOTÃO DE LOGOUT ADICIONADO --- */}
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <MaterialIcons name="logout" size={20} color="#c0392b" />
+        <Text style={styles.logoutButtonText}>Sair da Conta</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 };
@@ -254,10 +281,6 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#fff',
     marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
     elevation: 2,
   },
   profileImage: {
@@ -308,6 +331,7 @@ const styles = StyleSheet.create({
     padding: 15,
     backgroundColor: '#fff',
     minHeight: 100,
+    textAlignVertical: 'top',
     marginBottom: 10,
   },
   bioButtons: {
@@ -320,7 +344,8 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     backgroundColor: '#27ae60',
-    padding: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
     borderRadius: 5,
   },
   buttonText: {
@@ -351,10 +376,6 @@ const styles = StyleSheet.create({
   reportsSection: {
     backgroundColor: '#fff',
     padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
     elevation: 2,
   },
   sectionTitle: {
@@ -415,6 +436,25 @@ const styles = StyleSheet.create({
   },
   createButtonText: {
     color: '#fff',
+    fontWeight: 'bold',
+  },
+  // --- NOVOS ESTILOS PARA LOGOUT ---
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    margin: 20,
+    padding: 15,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#c0392b',
+    elevation: 2,
+  },
+  logoutButtonText: {
+    color: '#c0392b',
+    marginLeft: 10,
+    fontSize: 16,
     fontWeight: 'bold',
   },
 });
