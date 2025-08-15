@@ -9,7 +9,8 @@ import {
   ActivityIndicator,
   Modal,
   TextInput,
-  Alert
+  Alert,
+  Image // Importar o componente Image
 } from 'react-native';
 import { reportService } from '../services/database';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -65,37 +66,67 @@ const HomeScreen = ({ navigation, route }) => {
     (report.description && report.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const renderReport = ({ item }) => (
-    <TouchableOpacity
-      style={styles.reportItem}
-      onPress={() => navigation.navigate('ReportDetail', { report: item, user: user })}
-    >
-      <View style={styles.reportHeader}>
-        <Text style={styles.reportTitle}>{item.title}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: statusMap[item.status]?.color || '#7f8c8d' }]}>
-          <Text style={styles.statusBadgeText}>{statusMap[item.status]?.text || 'Desconhecido'}</Text>
+  // --- FUNÇÃO RENDER ATUALIZADA ---
+  const renderReport = ({ item }) => {
+    // Lógica para obter a URL da miniatura do vídeo
+    let thumbnailUrl = item.photo_uri;
+    if (item.media_type === 'video' && item.photo_uri) {
+      const parts = item.photo_uri.split('.');
+      parts.pop(); // Remove a extensão (ex: mp4)
+      thumbnailUrl = parts.join('.') + '.jpg'; // Adiciona .jpg para pegar o thumbnail do Cloudinary
+    }
+
+    return (
+      <TouchableOpacity
+        style={styles.reportItem}
+        onPress={() => navigation.navigate('ReportDetail', { report: item, user: user })}
+      >
+        {/* Se houver mídia, exibe a prévia */}
+        {item.photo_uri && (
+          <View style={styles.mediaPreview}>
+            <Image
+              source={{ uri: thumbnailUrl }}
+              style={styles.previewImage}
+            />
+            {/* Adiciona um ícone de "play" sobre os vídeos */}
+            {item.media_type === 'video' && (
+              <View style={styles.playIconContainer}>
+                <MaterialIcons name="play-circle-outline" size={48} color="rgba(255, 255, 255, 0.85)" />
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Conteúdo de texto da denúncia */}
+        <View style={styles.reportContent}>
+          <View style={styles.reportHeader}>
+            <Text style={styles.reportTitle}>{item.title}</Text>
+            <View style={[styles.statusBadge, { backgroundColor: statusMap[item.status]?.color || '#7f8c8d' }]}>
+              <Text style={styles.statusBadgeText}>{statusMap[item.status]?.text || 'Desconhecido'}</Text>
+            </View>
+          </View>
+
+          <Text style={styles.reportDescription}>
+            {item.description.substring(0, 100)}...
+          </Text>
+
+          {item.location && (
+            <View style={styles.locationContainer}>
+              <MaterialIcons name="location-on" size={16} color="#7f8c8d" />
+              <Text style={styles.reportLocation}>{item.location}</Text>
+            </View>
+          )}
+
+          <View style={styles.reportFooter}>
+            <Text style={[styles.badge, item.is_anonymous ? styles.anonymous : styles.identified]}>
+              {item.is_anonymous ? 'Anônima' : 'Identificada'}
+            </Text>
+            <Text style={styles.reportDate}>{new Date(item.created_at).toLocaleDateString('pt-BR')}</Text>
+          </View>
         </View>
-      </View>
-
-      <Text style={styles.reportDescription}>
-        {item.description.substring(0, 100)}...
-      </Text>
-
-      {item.location && (
-        <View style={styles.locationContainer}>
-          <MaterialIcons name="location-on" size={16} color="#7f8c8d" />
-          <Text style={styles.reportLocation}>{item.location}</Text>
-        </View>
-      )}
-
-      <View style={styles.reportFooter}>
-        <Text style={[styles.badge, item.is_anonymous ? styles.anonymous : styles.identified]}>
-          {item.is_anonymous ? 'Anônima' : 'Identificada'}
-        </Text>
-        <Text style={styles.reportDate}>{new Date(item.created_at).toLocaleDateString('pt-BR')}</Text>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -164,7 +195,7 @@ const HomeScreen = ({ navigation, route }) => {
 
       <TouchableOpacity
         style={[styles.addButton, { bottom: 20 + insets.bottom }]}
-        onPress={() => navigation.navigate('Report', { userId: user.id })}
+        onPress={() => navigation.navigate('Report', { user: user })}
       >
         <MaterialIcons name="add" size={28} color="#fff" />
       </TouchableOpacity>
@@ -249,14 +280,35 @@ const styles = StyleSheet.create({
   reportItem: {
     backgroundColor: '#fff',
     marginBottom: 15,
-    padding: 15,
     borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 2,
+    overflow: 'hidden', // Garante que a imagem não saia das bordas arredondadas
   },
+  // --- NOVOS ESTILOS ---
+  mediaPreview: {
+    width: '100%',
+    height: 200, // Altura da prévia
+    backgroundColor: '#e0e0e0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  playIconContainer: {
+    ...StyleSheet.absoluteFillObject, // Ocupa todo o espaço do container pai
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  reportContent: {
+    padding: 15, // Adiciona padding ao conteúdo de texto
+  },
+  // --- FIM DOS NOVOS ESTILOS ---
   reportHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6, alignItems: 'center' },
   reportTitle: { fontSize: 16, fontWeight: 'bold', color: '#2c3e50', flex: 1, marginRight: 10 },
   reportDate: { fontSize: 12, color: '#7f8c8d' },

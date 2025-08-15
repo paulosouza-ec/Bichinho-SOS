@@ -15,6 +15,7 @@ import { MaterialIcons, FontAwesome, Ionicons } from '@expo/vector-icons';
 import { reportService } from '../services/database';
 import moment from 'moment'; 
 import 'moment/locale/pt-br';
+import { Video } from 'expo-av'; // Importar o componente de vídeo
 
 moment.locale('pt-br');
 
@@ -37,6 +38,7 @@ const ReportDetailScreen = ({ route, navigation }) => {
   const [commentLoading, setCommentLoading] = useState(false);
   const [editingComment, setEditingComment] = useState(null);
   const [editCommentText, setEditCommentText] = useState('');
+  
 
   useEffect(() => {
     loadData();
@@ -251,8 +253,27 @@ const ReportDetailScreen = ({ route, navigation }) => {
               
               <Text style={styles.reportDescription}>{report.description}</Text>
               
+              {/* LÓGICA PARA EXIBIR FOTO OU VÍDEO */}
               {report.photo_uri && (
-                <Image source={{ uri: report.photo_uri }} style={styles.reportImage} resizeMode="cover" />
+                <View style={styles.mediaContainer}>
+                  {report.media_type === 'video' ? (
+                    <Video
+                      source={{ uri: report.photo_uri }}
+                      rate={1.0}
+                      volume={1.0}
+                      isMuted={false}
+                      resizeMode="contain"
+                      useNativeControls
+                      style={styles.media}
+                    />
+                  ) : (
+                    <Image 
+                      source={{ uri: report.photo_uri }} 
+                      style={styles.media}
+                      resizeMode="cover"
+                    />
+                  )}
+                </View>
               )}
               
               <View style={styles.likesContainer}>
@@ -365,7 +386,21 @@ const styles = StyleSheet.create({
   reportDescription: { fontSize: 15, color: '#555', marginVertical: 15, lineHeight: 22 },
   locationContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   reportLocation: { fontSize: 13, color: '#666', marginLeft: 5 },
-  reportImage: { width: '100%', height: 200, borderRadius: 5, marginVertical: 10 },
+  // Estilos para a mídia (foto/vídeo)
+  mediaContainer: {
+    width: '100%',
+    height: 250,
+    borderRadius: 8,
+    marginVertical: 10,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  media: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+  },
   likesContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 15, paddingTop: 15, borderTopWidth: 1, borderTopColor: '#eee' },
   likeButton: { marginRight: 10 },
   likesCount: { fontSize: 14, color: '#666' },

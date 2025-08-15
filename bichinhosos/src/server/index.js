@@ -18,6 +18,26 @@ const pool = new Pool({
   port: process.env.DB_PORT || 5432,
 });
 
+//Configs cloudnary
+
+const cloudinary = require('cloudinary').v2;
+
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// Configura o Multer para usar a memória, pois vamos fazer o upload via stream
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 20 * 1024 * 1024, // Limite de 20MB para os arquivos
+  },
+});
+
+
 // Middlewares
 app.use(cors({
   origin: '*',
@@ -149,12 +169,12 @@ app.put('/api/reports/:id/status', async (req, res) => {
 // Rota para criar denúncia
 app.post('/api/reports', async (req, res) => {
   try {
-    const { userId, title, description, location, isAnonymous, photo_uri } = req.body;
+    const { userId, title, description, location, isAnonymous, media_url, media_type } = req.body;
     
     const newReport = await pool.query(
-      `INSERT INTO reports (user_id, title, description, location, is_anonymous, photo_uri)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [isAnonymous ? null : userId, title, description, location || null, isAnonymous, photo_uri || null]
+      `INSERT INTO reports (user_id, title, description, location, is_anonymous, photo_uri, media_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [isAnonymous ? null : userId, title, description, location || null, isAnonymous, media_url || null, media_type || null]
     );
     
     res.status(201).json({ report: newReport.rows[0] });
@@ -163,6 +183,7 @@ app.post('/api/reports', async (req, res) => {
     res.status(500).json({ message: 'Erro ao criar denúncia' });
   }
 });
+
 
 app.get('/api/reports/:id', async (req, res) => {
   try {
@@ -501,16 +522,46 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ storage });
+
 
 // Rota para upload
-app.post('/api/upload', upload.single('image'), (req, res) => {
+app.post('/api/upload', upload.single('media'), (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ error: 'Nenhuma imagem enviada' });
+    return res.status(400).json({ message: 'Nenhum arquivo enviado.' });
   }
-  const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
-  res.json({ imageUrl });
+
+  // Função que envia o buffer do arquivo para o Cloudinary
+  const uploadStream = (buffer, options) => {
+    return new Promise((resolve, reject) => {
+      cloudinary.uploader.upload_stream(options, (error, result) => {
+        if (result) {
+          resolve(result);
+        } else {
+          reject(error);
+        }
+      }).end(buffer);
+    });
+  };
+
+  const options = {
+    folder: 'bichinho-sos',
+    resource_type: 'auto',
+  };
+
+  // Executa o upload e retorna a URL
+  uploadStream(req.file.buffer, options)
+    .then(result => {
+      res.status(200).json({
+        media_url: result.secure_url, // Usar a URL segura é a melhor prática
+        media_type: result.resource_type,
+      });
+    })
+    .catch(err => {
+      console.error('Erro no upload para o Cloudinary:', err);
+      res.status(500).json({ message: 'Erro ao enviar mídia.' });
+    });
 });
+
 
 // Inicia o servidor
 app.listen(port, () => {
