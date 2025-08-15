@@ -19,9 +19,7 @@ const pool = new Pool({
 });
 
 //Configs cloudnary
-
 const cloudinary = require('cloudinary').v2;
-
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -37,7 +35,6 @@ const upload = multer({
   },
 });
 
-
 // Middlewares
 app.use(cors({
   origin: '*',
@@ -47,35 +44,65 @@ app.use(cors({
 app.use(bodyParser.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Rota de Registro Atualizada
+// Rota de Registro ATUALIZADA E ADAPTADA
 app.post('/auth/register', async (req, res) => {
   try {
-    const { name, email, password, phone, nickname, profile_pic, user_type } = req.body;
-    
-    const nicknameCheck = await pool.query('SELECT id FROM users WHERE nickname ILIKE $1', [nickname]);
-    if (nicknameCheck.rows.length > 0) {
-      return res.status(400).json({ message: 'Apelido já em uso' });
-    }
+    const { user_type, email } = req.body;
 
+    // 1. Checagem de e-mail (comum a ambos os tipos de usuário)
     const emailCheck = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
     if (emailCheck.rows.length > 0) {
       return res.status(400).json({ message: 'Email já cadastrado' });
     }
 
-    const newUser = await pool.query(
-      `INSERT INTO users (name, email, password, phone, nickname, profile_pic, user_type) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7) 
-       RETURNING id, name, email, nickname, profile_pic, user_type`,
-      [name, email, password, phone, nickname, profile_pic || null, user_type || 'common']
-    );
-    
-    res.status(201).json({ user: newUser.rows[0] });
+    // 2. Lógica de cadastro para Órgãos/ONGs
+    if (user_type === 'agency') {
+      const { organization_name, cnpj, address, password, phone, profile_pic } = req.body;
+
+      // Checagem de CNPJ
+      const cnpjCheck = await pool.query('SELECT id FROM users WHERE cnpj = $1', [cnpj]);
+      if (cnpjCheck.rows.length > 0) {
+        return res.status(400).json({ message: 'CNPJ já cadastrado' });
+      }
+
+      // Inserção no banco de dados (note os novos campos)
+      // O nome da organização também é salvo na coluna 'name' para consistência
+      const newUser = await pool.query(
+        `INSERT INTO users (name, email, password, phone, profile_pic, user_type, organization_name, cnpj, address) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+         RETURNING id, name, email, profile_pic, user_type`,
+        [organization_name, email, password, phone, profile_pic || null, 'agency', organization_name, cnpj, address]
+      );
+      
+      return res.status(201).json({ user: newUser.rows[0] });
+
+    // 3. Lógica de cadastro para Cidadão (lógica original)
+    } else {
+      const { name, password, phone, nickname, profile_pic } = req.body;
+      
+      // Checagem de apelido
+      const nicknameCheck = await pool.query('SELECT id FROM users WHERE nickname ILIKE $1', [nickname]);
+      if (nicknameCheck.rows.length > 0) {
+        return res.status(400).json({ message: 'Apelido já em uso' });
+      }
+
+      // Inserção no banco de dados para usuário comum
+      const newUser = await pool.query(
+        `INSERT INTO users (name, email, password, phone, nickname, profile_pic, user_type) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7) 
+         RETURNING id, name, email, nickname, profile_pic, user_type`,
+        [name, email, password, phone, nickname, profile_pic || null, 'common']
+      );
+      
+      return res.status(201).json({ user: newUser.rows[0] });
+    }
     
   } catch (error) {
     console.error('Erro no registro:', error);
     res.status(500).json({ message: 'Erro ao registrar usuário' });
   }
 });
+
 
 // Rota de Login Atualizada
 app.post('/auth/login', async (req, res) => {

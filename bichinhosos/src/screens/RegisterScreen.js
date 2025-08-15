@@ -19,15 +19,24 @@ import { authService } from '../services/database';
 const DEFAULT_PROFILE_IMAGE = { uri: 'https://cdn-icons-png.flaticon.com/512/1946/1946429.png' };
 
 const RegisterScreen = ({ navigation }) => {
-  const [name, setName] = useState('');
+  // Estados comuns
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
-  const [nickname, setNickname] = useState('');
   const [profilePic, setProfilePic] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [userType, setUserType] = useState('common'); // 'common' ou 'agency'
+
+  // Estados para usuário 'common'
+  const [name, setName] = useState('');
+  const [nickname, setNickname] = useState('');
+
+  // Estados para usuário 'agency'
+  const [organizationName, setOrganizationName] = useState('');
+  const [cnpj, setCnpj] = useState('');
+  const [address, setAddress] = useState('');
+
 
   const pickImage = async () => {
     try {
@@ -54,44 +63,153 @@ const RegisterScreen = ({ navigation }) => {
   };
 
   const handleRegister = async () => {
-    if (!name || !email || !password || !phone || !nickname) {
-      Alert.alert('Erro', 'Por favor, preencha todos os campos obrigatórios.');
-      return;
-    }
-
-    if (nickname.length < 3) {
-      Alert.alert('Erro', 'O apelido deve ter pelo menos 3 caracteres.');
-      return;
+    // Validação de campos comuns
+    if (!email || !password || !phone) {
+        Alert.alert('Erro', 'Por favor, preencha os campos de email, senha e telefone.');
+        return;
     }
 
     setLoading(true);
-    try {
-      const nicknameResponse = await authService.checkNickname(nickname);
-      if (!nicknameResponse.available) {
-        Alert.alert('Erro', 'Este apelido já está em uso. Por favor, escolha outro.');
-        setLoading(false);
-        return;
-      }
 
-      await authService.registerUser({
-        name, 
-        email, 
-        password,
-        phone,
-        nickname,
-        profile_pic: profilePic,
-        user_type: userType
-      });
+    try {
+        let registrationData;
+
+        // Monta o payload de acordo com o tipo de usuário
+        if (userType === 'common') {
+            if (!name || !nickname) {
+                Alert.alert('Erro', 'Por favor, preencha seu nome completo e apelido.');
+                setLoading(false);
+                return;
+            }
+            if (nickname.length < 3) {
+                Alert.alert('Erro', 'O apelido deve ter pelo menos 3 caracteres.');
+                setLoading(false);
+                return;
+            }
+            
+            const nicknameResponse = await authService.checkNickname(nickname);
+            if (!nicknameResponse.available) {
+                Alert.alert('Erro', 'Este apelido já está em uso. Por favor, escolha outro.');
+                setLoading(false);
+                return;
+            }
+
+            registrationData = {
+                name,
+                nickname,
+                email,
+                password,
+                phone,
+                profile_pic: profilePic,
+                user_type: 'common',
+            };
+        } else { // agency
+            if (!organizationName || !cnpj || !address) {
+                Alert.alert('Erro', 'Por favor, preencha o nome da organização, CNPJ e endereço.');
+                setLoading(false);
+                return;
+            }
+            
+            registrationData = {
+                organization_name: organizationName,
+                cnpj,
+                address,
+                email,
+                password,
+                phone,
+                profile_pic: profilePic,
+                user_type: 'agency',
+            };
+        }
+
+        await authService.registerUser(registrationData);
       
-      Alert.alert('Sucesso', 'Cadastro realizado com sucesso!', [
-        { text: 'OK', onPress: () => navigation.navigate('Login') }
-      ]);
+        Alert.alert('Sucesso', 'Cadastro realizado com sucesso!', [
+            { text: 'OK', onPress: () => navigation.navigate('Login') }
+        ]);
       
     } catch (error) {
-      console.error('Erro no cadastro:', error);
-      Alert.alert('Erro', error.message || 'Falha ao cadastrar usuário.');
+        console.error('Erro no cadastro:', error);
+        Alert.alert('Erro', error.message || 'Falha ao cadastrar usuário.');
     } finally {
-      setLoading(false);
+        setLoading(false);
+    }
+  };
+
+  // Componente para renderizar os campos de acordo com o userType
+  const renderFormFields = () => {
+    if (userType === 'common') {
+      return (
+        <>
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>Nome completo</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Digite seu nome completo"
+                placeholderTextColor="#999"
+                value={name}
+                onChangeText={setName}
+              />
+            </View>
+          </View>
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>Apelido</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Escolha um nome de usuário"
+                placeholderTextColor="#999"
+                value={nickname}
+                onChangeText={setNickname}
+                autoCapitalize="none"
+              />
+            </View>
+          </View>
+        </>
+      );
+    } else { // agency
+      return (
+        <>
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>Nome da Organização/ONG</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Nome oficial da entidade"
+                placeholderTextColor="#999"
+                value={organizationName}
+                onChangeText={setOrganizationName}
+              />
+            </View>
+          </View>
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>CNPJ</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="XX.XXX.XXX/XXXX-XX"
+                placeholderTextColor="#999"
+                value={cnpj}
+                onChangeText={setCnpj}
+                keyboardType="number-pad"
+              />
+            </View>
+          </View>
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>Endereço</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Endereço completo da sede"
+                placeholderTextColor="#999"
+                value={address}
+                onChangeText={setAddress}
+              />
+            </View>
+          </View>
+        </>
+      );
     }
   };
 
@@ -150,19 +268,10 @@ const RegisterScreen = ({ navigation }) => {
             </Text>
           </View>
 
-          <View style={styles.inputWrapper}>
-            <Text style={styles.inputLabel}>Nome completo</Text>
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Digite seu nome completo"
-                placeholderTextColor="#999"
-                value={name}
-                onChangeText={setName}
-              />
-            </View>
-          </View>
+          {/* CAMPOS RENDERIZADOS CONDICIONALMENTE */}
+          {renderFormFields()}
 
+          {/* CAMPOS COMUNS */}
           <View style={styles.inputWrapper}>
             <Text style={styles.inputLabel}>Email</Text>
             <View style={styles.inputContainer}>
@@ -216,21 +325,7 @@ const RegisterScreen = ({ navigation }) => {
               />
             </View>
           </View>
-
-          <View style={styles.inputWrapper}>
-            <Text style={styles.inputLabel}>Apelido</Text>
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Escolha um nome de usuário"
-                placeholderTextColor="#999"
-                value={nickname}
-                onChangeText={setNickname}
-                autoCapitalize="none"
-              />
-            </View>
-          </View>
-
+          
           <TouchableOpacity 
             style={styles.registerButton}
             onPress={handleRegister}
