@@ -37,5 +37,5 @@ yarn-error.*
 
 
 #env 
-.env
+*.env
 
