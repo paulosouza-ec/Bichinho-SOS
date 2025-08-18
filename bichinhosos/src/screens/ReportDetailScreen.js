@@ -9,7 +9,10 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
-  FlatList
+  FlatList,
+  Share,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
 import { MaterialIcons, FontAwesome, Ionicons } from '@expo/vector-icons';
 import { reportService } from '../services/database';
@@ -39,35 +42,44 @@ const ReportDetailScreen = ({ route, navigation }) => {
   const [editingComment, setEditingComment] = useState(null);
   const [editCommentText, setEditCommentText] = useState('');
   
+  // States para notas internas da agência
+  const [agencyNotes, setAgencyNotes] = useState([]);
+  const [newNote, setNewNote] = useState('');
+  const [noteLoading, setNoteLoading] = useState(false);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [report.id]);
 
-  // Recarrega os dados da denúncia quando a tela volta a ter foco (após uma edição)
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      // Verifica se há uma denúncia atualizada vinda da tela de edição
       if (route.params?.updatedReport) {
         setReport(route.params.updatedReport);
       }
     });
-
     return unsubscribe;
   }, [navigation, route.params?.updatedReport]);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const [isLiked, count, commentsData] = await Promise.all([
+      const promises = [
         reportService.checkUserLike(report.id, user.id),
         reportService.getLikesCount(report.id),
         reportService.getComments(report.id)
-      ]);
+      ];
+      if (user.user_type === 'agency') {
+        promises.push(reportService.getAgencyNotes(report.id));
+      }
+
+      const [isLiked, count, commentsData, notesData] = await Promise.all(promises);
       
       setLiked(isLiked);
       setLikesCount(count);
       setComments(commentsData);
+      if (notesData) {
+        setAgencyNotes(notesData);
+      }
       
     } catch (error) {
       Alert.alert('Erro', error.message);
@@ -88,16 +100,9 @@ const ReportDetailScreen = ({ route, navigation }) => {
 
   const handleAddComment = async () => {
     if (!newComment.trim()) return;
-    
     try {
       setCommentLoading(true);
-      const comment = await reportService.addComment(
-        report.id, 
-        user.id, 
-        newComment,
-        replyingTo?.id
-      );
-      
+      const comment = await reportService.addComment(report.id, user.id, newComment, replyingTo?.id);
       setComments(prev => [comment, ...prev]);
       setNewComment('');
       setReplyingTo(null);
@@ -110,16 +115,8 @@ const ReportDetailScreen = ({ route, navigation }) => {
 
   const handleEditComment = async (comment) => {
     try {
-      const updatedComment = await reportService.editComment(
-        report.id,
-        comment.id,
-        user.id,
-        editCommentText
-      );
-      
-      setComments(prev => prev.map(c => 
-        c.id === comment.id ? { ...c, content: updatedComment.content } : c
-      ));
+      const updatedComment = await reportService.editComment(report.id, comment.id, user.id, editCommentText);
+      setComments(prev => prev.map(c => c.id === comment.id ? { ...c, content: updatedComment.content } : c));
       setEditingComment(null);
       setEditCommentText('');
     } catch (error) {
@@ -137,6 +134,7 @@ const ReportDetailScreen = ({ route, navigation }) => {
   };
 
   const handleChangeStatus = async (newStatus) => {
+    if (newStatus === report.status) return;
     try {
       const updatedReport = await reportService.updateReportStatus(report.id, newStatus, user.id);
       setReport(updatedReport);
@@ -146,9 +144,22 @@ const ReportDetailScreen = ({ route, navigation }) => {
     }
   };
 
-  // --- FUNÇÃO ADICIONADA: PARA NAVEGAR PARA A TELA DE EDIÇÃO ---
   const handleNavigateToEdit = () => {
     navigation.navigate('Report', { user, reportToEdit: report });
+  };
+
+  const handleAddNote = async () => {
+    if (!newNote.trim()) return;
+    try {
+      setNoteLoading(true);
+      const note = await reportService.addAgencyNote(report.id, user.id, newNote);
+      setAgencyNotes(prev => [note, ...prev]);
+      setNewNote('');
+    } catch (error) {
+      Alert.alert('Erro', error.message);
+    } finally {
+      setNoteLoading(false);
+    }
   };
 
   const renderComment = ({ item }) => (
@@ -229,6 +240,22 @@ const ReportDetailScreen = ({ route, navigation }) => {
     </View>
   );
 
+  const renderAgencyNote = ({ item }) => (
+    <View style={styles.noteContainer}>
+      <View style={styles.commentHeader}>
+         <Image 
+          source={{ uri: item.user_avatar || 'https://cdn-icons-png.flaticon.com/512/1946/1946429.png' }} 
+          style={styles.userAvatar}
+        />
+        <View style={styles.commentAuthorContainer}>
+          <Text style={styles.commentAuthor}>{item.user_name} (Agente)</Text>
+          <Text style={styles.commentDate}>{moment(item.created_at).fromNow()}</Text>
+        </View>
+      </View>
+      <Text style={styles.commentText}>{item.content}</Text>
+    </View>
+  );
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -238,7 +265,10 @@ const ReportDetailScreen = ({ route, navigation }) => {
   }
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+    >
       <FlatList
         ListHeaderComponent={
           <>
@@ -248,14 +278,12 @@ const ReportDetailScreen = ({ route, navigation }) => {
               </TouchableOpacity>
               <Text style={styles.title}>Detalhes da Denúncia</Text>
               
-              {/* --- BOTÃO DE EDITAR ADICIONADO --- */}
-              {/* Aparece apenas se o usuário logado for o autor da denúncia */}
               {user && user.id === report.user_id ? (
                 <TouchableOpacity onPress={handleNavigateToEdit}>
                   <MaterialIcons name="edit" size={24} color="#2c3e50" />
                 </TouchableOpacity>
               ) : (
-                <View style={{ width: 24 }} /> // Espaço vazio para manter o alinhamento
+                <View style={{ width: 24 }} />
               )}
             </View>
             
@@ -310,19 +338,45 @@ const ReportDetailScreen = ({ route, navigation }) => {
             </View>
             
             {user.user_type === 'agency' && (
-              <View style={styles.agencyActionsContainer}>
-                <Text style={styles.sectionTitle}>Ações do Órgão</Text>
-                <View style={styles.agencyButtons}>
-                  <TouchableOpacity style={styles.actionButton} onPress={() => handleChangeStatus('seen')}>
-                    <Text style={styles.actionButtonText}>Marcar como Visto</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.actionButton} onPress={() => handleChangeStatus('in_progress')}>
-                    <Text style={styles.actionButtonText}>Iniciar Atendimento</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.actionButton} onPress={() => handleChangeStatus('resolved')}>
-                    <Text style={styles.actionButtonText}>Marcar como Resolvido</Text>
+              <View style={styles.agencySection}>
+                <Text style={styles.sectionTitle}>Gerenciar Status</Text>
+                <View style={styles.statusSelector}>
+                  {Object.keys(statusMap).map((key) => (
+                    <TouchableOpacity
+                      key={key}
+                      style={[
+                        styles.statusOption,
+                        { backgroundColor: report.status === key ? statusMap[key].color : '#f0f0f0' },
+                      ]}
+                      onPress={() => handleChangeStatus(key)}
+                    >
+                      <Text style={[styles.statusOptionText, { color: report.status === key ? '#fff' : '#555'}]}>
+                        {statusMap[key].text}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Log de Atividades (Interno)</Text>
+                <View style={styles.commentInputContainer}>
+                  <TextInput
+                    style={styles.commentInput}
+                    placeholder="Adicionar nota interna..."
+                    value={newNote}
+                    onChangeText={setNewNote}
+                    multiline
+                  />
+                  <TouchableOpacity 
+                    style={styles.commentButton}
+                    onPress={handleAddNote}
+                    disabled={noteLoading}
+                  >
+                    {noteLoading ? <ActivityIndicator size="small" color="#fff" /> : <MaterialIcons name="add" size={20} color="#fff" />}
                   </TouchableOpacity>
                 </View>
+
+                {agencyNotes.map(note => renderAgencyNote({ item: note }))}
+
               </View>
             )}
             
@@ -371,7 +425,7 @@ const ReportDetailScreen = ({ route, navigation }) => {
         }
         contentContainerStyle={{ paddingBottom: 40 }}
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -428,10 +482,40 @@ const styles = StyleSheet.create({
   likesContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 15, paddingTop: 15, borderTopWidth: 1, borderTopColor: '#eee' },
   likeButton: { marginRight: 10 },
   likesCount: { fontSize: 14, color: '#666' },
-  agencyActionsContainer: { backgroundColor: '#fff', marginHorizontal: 15, marginBottom: 15, borderRadius: 10, padding: 15, elevation: 2 },
-  agencyButtons: { marginTop: 10 },
-  actionButton: { backgroundColor: '#27ae60', padding: 12, borderRadius: 8, alignItems: 'center', marginBottom: 10 },
-  actionButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  agencySection: { 
+    backgroundColor: '#fff', 
+    marginHorizontal: 15, 
+    marginBottom: 15, 
+    borderRadius: 10, 
+    padding: 15, 
+    elevation: 2 
+  },
+  statusSelector: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    flexWrap: 'wrap',
+    marginTop: 10,
+  },
+  statusOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    margin: 4,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  statusOptionText: {
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  noteContainer: {
+    backgroundColor: '#FFF8E1',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: '#FFC107',
+  },
   commentsSection: { marginHorizontal: 15, padding: 15, backgroundColor: '#fff', borderRadius: 10, elevation: 2 },
   sectionTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 15, color: '#333' },
   commentInputContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },

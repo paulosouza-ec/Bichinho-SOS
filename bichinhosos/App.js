@@ -12,6 +12,7 @@ import AgencyHomeScreen from './src/screens/AgencyHomeScreen';
 import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
 import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
 
+
 const Stack = createStackNavigator();
 
 export default function App() {
@@ -68,7 +69,6 @@ export default function App() {
           name="ResetPassword" 
           component={ResetPasswordScreen} 
           options={{ title: 'Redefinir Senha' }} />
-
       </Stack.Navigator>
     </NavigationContainer>
   );

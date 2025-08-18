@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,15 +7,19 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
-  Modal,
-  TextInput,
   Alert,
-  Image // Importar o componente Image
+  Image,
+  TextInput,
+  ScrollView // Importar ScrollView
 } from 'react-native';
 import { reportService } from '../services/database';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import moment from 'moment';
+import 'moment/locale/pt-br';
+
+moment.locale('pt-br');
 
 const statusMap = {
   pending: { text: 'Pendente', color: '#f39c12' },
@@ -26,21 +30,47 @@ const statusMap = {
 
 const HomeScreen = ({ navigation, route }) => {
   const [reports, setReports] = useState([]);
+  const [popularReports, setPopularReports] = useState([]); // NOVO: Para o carrossel
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [searchVisible, setSearchVisible] = useState(false); // NOVO: Controla a visibilidade da busca
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterModalVisible, setFilterModalVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState('all');
-  const [filter, setFilter] = useState('all');
+  
+  // NOVO: Sistema de filtros unificado
+  const [activeFilter, setActiveFilter] = useState({ type: 'all', value: null }); 
+  
   const { user } = route.params;
   const insets = useSafeAreaInsets();
 
-  const loadReports = async () => {
+  const loadReports = useCallback(async () => {
     try {
-      setLoading(true);
-      const params = activeTab === 'my' ? { userId: user.id } : { filter };
-      const reportsData = await reportService.getReports(params);
+      !refreshing && setLoading(true);
+
+      const params = {};
+      switch (activeFilter.type) {
+        case 'my':
+          params.userId = user.id;
+          break;
+        case 'anonymous':
+          params.filter = 'anonymous';
+          break;
+        case 'resolved':
+          params.status = 'resolved';
+          break;
+      }
+      if (searchQuery) {
+        params.searchTerm = searchQuery;
+      }
+
+      // Busca as denúncias e os populares em paralelo
+      const [reportsData, popularData] = await Promise.all([
+        reportService.getReports(params),
+        reportService.getPopularReports() // Busca os populares
+      ]);
+      
       setReports(reportsData);
+      setPopularReports(popularData);
+
     } catch (error) {
       console.error('Erro ao carregar denúncias:', error);
       Alert.alert('Erro', error.message);
@@ -48,12 +78,12 @@ const HomeScreen = ({ navigation, route }) => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [activeFilter, refreshing, searchQuery]); // Adicionado searchQuery como dependência
   
   useFocusEffect(
     useCallback(() => {
       loadReports();
-    }, [activeTab, filter])
+    }, [activeFilter]) // Recarrega quando o filtro muda
   );
 
   const handleRefresh = () => {
@@ -61,80 +91,93 @@ const HomeScreen = ({ navigation, route }) => {
     loadReports();
   };
 
-  const filteredReports = reports.filter(report =>
-    (report.title && report.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (report.description && report.description.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
-
-  // --- FUNÇÃO RENDER ATUALIZADA ---
-  const renderReport = ({ item }) => {
-    // Lógica para obter a URL da miniatura do vídeo
+  // Componente para o card de denúncia (usado nos dois carrosséis)
+  const ReportCard = ({ item, isHorizontal }) => {
     let thumbnailUrl = item.photo_uri;
     if (item.media_type === 'video' && item.photo_uri) {
       const parts = item.photo_uri.split('.');
-      parts.pop(); // Remove a extensão (ex: mp4)
-      thumbnailUrl = parts.join('.') + '.jpg'; // Adiciona .jpg para pegar o thumbnail do Cloudinary
+      parts.pop();
+      thumbnailUrl = parts.join('.') + '.jpg';
     }
 
     return (
       <TouchableOpacity
-        style={styles.reportItem}
+        style={[styles.reportItem, isHorizontal && styles.horizontalReportItem]}
         onPress={() => navigation.navigate('ReportDetail', { report: item, user: user })}
       >
-        {/* Se houver mídia, exibe a prévia */}
-        {item.photo_uri && (
+        {thumbnailUrl && (
           <View style={styles.mediaPreview}>
-            <Image
-              source={{ uri: thumbnailUrl }}
-              style={styles.previewImage}
-            />
-            {/* Adiciona um ícone de "play" sobre os vídeos */}
+            <Image source={{ uri: thumbnailUrl }} style={styles.previewImage} />
             {item.media_type === 'video' && (
-              <View style={styles.playIconContainer}>
-                <MaterialIcons name="play-circle-outline" size={48} color="rgba(255, 255, 255, 0.85)" />
-              </View>
+              <View style={styles.playIconContainer}><MaterialIcons name="play-circle-outline" size={48} color="#fff" /></View>
             )}
           </View>
         )}
-
-        {/* Conteúdo de texto da denúncia */}
         <View style={styles.reportContent}>
           <View style={styles.reportHeader}>
-            <Text style={styles.reportTitle}>{item.title}</Text>
+            <Text style={styles.reportTitle} numberOfLines={2}>{item.title}</Text>
             <View style={[styles.statusBadge, { backgroundColor: statusMap[item.status]?.color || '#7f8c8d' }]}>
-              <Text style={styles.statusBadgeText}>{statusMap[item.status]?.text || 'Desconhecido'}</Text>
+              <Text style={styles.statusBadgeText}>{statusMap[item.status]?.text}</Text>
             </View>
           </View>
-
-          <Text style={styles.reportDescription}>
-            {item.description.substring(0, 100)}...
-          </Text>
-
-          {item.location && (
-            <View style={styles.locationContainer}>
-              <MaterialIcons name="location-on" size={16} color="#7f8c8d" />
-              <Text style={styles.reportLocation}>{item.location}</Text>
-            </View>
-          )}
-
+          <Text style={styles.reportDescription} numberOfLines={2}>{item.description}</Text>
           <View style={styles.reportFooter}>
-            <Text style={[styles.badge, item.is_anonymous ? styles.anonymous : styles.identified]}>
-              {item.is_anonymous ? 'Anônima' : 'Identificada'}
-            </Text>
-            <Text style={styles.reportDate}>{new Date(item.created_at).toLocaleDateString('pt-BR')}</Text>
+            <Text style={styles.reportAuthor}>{item.is_anonymous ? 'Anônimo' : item.user_name || 'Usuário'}</Text>
+            <View style={styles.reportStats}>
+              <MaterialIcons name="comment" size={14} color="#7f8c8d" /><Text style={styles.statText}>{item.comments_count || 0}</Text>
+              <MaterialIcons name="favorite" size={14} color="#7f8c8d" style={{ marginLeft: 8 }} /><Text style={styles.statText}>{item.likes_count || 0}</Text>
+            </View>
           </View>
         </View>
       </TouchableOpacity>
     );
   };
 
+  // Componente para os chips de filtro
+  const FilterChips = () => {
+    const filters = [
+      { label: 'Todas', type: 'all' },
+      { label: 'Minhas', type: 'my' },
+      { label: 'Anônimas', type: 'anonymous' },
+      { label: 'Resolvidas', type: 'resolved' },
+    ];
+    return (
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterContainer}>
+        {filters.map(filter => (
+          <TouchableOpacity
+            key={filter.type}
+            style={[styles.filterChip, activeFilter.type === filter.type && styles.activeFilterChip]}
+            onPress={() => setActiveFilter(filter)}
+          >
+            <Text style={[styles.filterChipText, activeFilter.type === filter.type && styles.activeFilterChipText]}>
+              {filter.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    );
+  };
+
   return (
     <View style={styles.container}>
+      {/* --- CABEÇALHO REDESENHADO --- */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>BichinhoSOS</Text>
+        {searchVisible ? (
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar por título ou descrição..."
+            placeholderTextColor="#ccc"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onSubmitEditing={loadReports}
+            autoFocus
+          />
+        ) : (
+          <Text style={styles.headerTitle}>BichinhoSOS</Text>
+        )}
         <View style={styles.headerIcons}>
-          <TouchableOpacity onPress={() => setFilterModalVisible(true)}>
-            <MaterialIcons name="filter-list" size={26} color="#fff" />
+          <TouchableOpacity onPress={() => setSearchVisible(!searchVisible)}>
+            <MaterialIcons name={searchVisible ? "close" : "search"} size={26} color="#fff" />
           </TouchableOpacity>
           <TouchableOpacity 
             onPress={() => navigation.navigate('Profile', { userId: user.id })}
@@ -145,52 +188,45 @@ const HomeScreen = ({ navigation, route }) => {
         </View>
       </View>
 
-      <View style={styles.tabContainer}>
-        {['all', 'my'].map(tab => (
-          <TouchableOpacity
-            key={tab}
-            style={[styles.tabButton, activeTab === tab && styles.activeTab]}
-            onPress={() => setActiveTab(tab)}
-          >
-            <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
-              {tab === 'all' ? 'Todas' : 'Minhas'}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Buscar denúncias..."
-          placeholderTextColor="#999"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        <MaterialIcons name="search" size={22} color="#999" />
-      </View>
-
       {loading && !refreshing ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#27ae60" />
-        </View>
+        <ActivityIndicator size="large" color="#27ae60" style={{ flex: 1 }} />
       ) : (
-        <FlatList
-          data={filteredReports}
-          renderItem={renderReport}
-          keyExtractor={item => item.id.toString()}
-          contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 20 }}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#27ae60']} />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>
-                {activeTab === 'all' ? 'Nenhuma denúncia encontrada' : 'Você ainda não fez denúncias'}
-              </Text>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#27ae60']} />}
+        >
+          {/* --- CARROSSEL DE POPULARES --- */}
+          {popularReports.length > 0 && !searchQuery && (
+            <View>
+              <Text style={styles.sectionTitle}>Populares na Comunidade</Text>
+              <FlatList
+                horizontal
+                data={popularReports}
+                renderItem={({ item }) => <ReportCard item={item} isHorizontal />}
+                keyExtractor={item => item.id.toString()}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 10 }}
+              />
             </View>
-          }
-        />
+          )}
+
+          {/* --- FILTROS INTELIGENTES --- */}
+          {!searchQuery && <FilterChips />}
+
+          {/* --- LISTA PRINCIPAL --- */}
+          <Text style={styles.sectionTitle}>
+            {searchQuery ? `Resultados para "${searchQuery}"` : 'Denúncias Recentes'}
+          </Text>
+          {reports.length > 0 ? (
+            <View style={{ paddingHorizontal: 20 }}>
+              {reports.map(item => <ReportCard key={item.id} item={item} isHorizontal={false} />)}
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>Nenhuma denúncia encontrada.</Text>
+            </View>
+          )}
+        </ScrollView>
       )}
 
       <TouchableOpacity
@@ -199,46 +235,12 @@ const HomeScreen = ({ navigation, route }) => {
       >
         <MaterialIcons name="add" size={28} color="#fff" />
       </TouchableOpacity>
-
-      <Modal
-        animationType="slide"
-        transparent
-        visible={filterModalVisible}
-        onRequestClose={() => setFilterModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Filtrar Denúncias</Text>
-            {['all', 'anonymous', 'identified'].map(option => (
-              <TouchableOpacity
-                key={option}
-                style={[styles.filterOption, filter === option && styles.filterOptionSelected]}
-                onPress={() => {
-                  setFilter(option);
-                  setFilterModalVisible(false);
-                }}
-              >
-                <Text style={styles.filterOptionText}>
-                  {option === 'all'
-                    ? 'Todas as denúncias'
-                    : option === 'anonymous'
-                    ? 'Denúncias anônimas'
-                    : 'Denúncias identificadas'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity style={styles.closeButton} onPress={() => setFilterModalVisible(false)}>
-              <Text style={styles.closeButtonText}>Fechar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  container: { flex: 1, backgroundColor: '#f0f2f5' },
   header: {
     backgroundColor: '#27ae60',
     paddingTop: 50,
@@ -250,91 +252,87 @@ const styles = StyleSheet.create({
   },
   headerTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
   headerIcons: { flexDirection: 'row' },
-  tabContainer: {
-    flexDirection: 'row',
-    marginHorizontal: 20,
-    marginTop: 15,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 10,
-  },
-  tabButton: { flex: 1, padding: 12, alignItems: 'center' },
-  tabText: { color: '#2c3e50', fontWeight: '500' },
-  activeTab: { backgroundColor: '#27ae60', borderRadius: 10 },
-  activeTabText: { color: '#fff', fontWeight: 'bold' },
-  searchContainer: {
-    backgroundColor: '#fff',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 15,
-    borderRadius: 10,
-    margin: 20,
-    borderWidth: 1,
-    borderColor: '#dcdcdc',
-  },
   searchInput: {
     flex: 1,
-    height: 45,
+    color: '#fff',
     fontSize: 16,
-    color: '#333',
+    borderBottomWidth: 1,
+    borderBottomColor: '#fff',
+    paddingBottom: 5,
   },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 15,
+  },
+  filterContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    marginBottom: 10,
+  },
+  filterChip: {
+    backgroundColor: '#fff',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 20,
+    marginRight: 10,
+    elevation: 1,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  activeFilterChip: {
+    backgroundColor: '#2c3e50',
+    borderColor: '#2c3e50',
+  },
+  filterChipText: { color: '#333', fontWeight: '500' },
+  activeFilterChipText: { color: '#fff' },
   reportItem: {
     backgroundColor: '#fff',
     marginBottom: 15,
     borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
     elevation: 2,
-    overflow: 'hidden', // Garante que a imagem não saia das bordas arredondadas
+    overflow: 'hidden',
   },
-  // --- NOVOS ESTILOS ---
+  horizontalReportItem: {
+    width: 280, // Largura do card horizontal
+    marginRight: 15,
+  },
   mediaPreview: {
     width: '100%',
-    height: 200, // Altura da prévia
+    height: 150,
     backgroundColor: '#e0e0e0',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   previewImage: {
     width: '100%',
     height: '100%',
   },
   playIconContainer: {
-    ...StyleSheet.absoluteFillObject, // Ocupa todo o espaço do container pai
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
-  reportContent: {
-    padding: 15, // Adiciona padding ao conteúdo de texto
+  reportContent: { padding: 12 },
+  reportHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 },
+  reportTitle: { fontSize: 16, fontWeight: 'bold', color: '#2c3e50', flex: 1, marginRight: 8 },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, alignSelf: 'flex-start' },
+  statusBadgeText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
+  reportDescription: { fontSize: 14, color: '#555', lineHeight: 20, marginBottom: 10 },
+  reportFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    paddingTop: 8,
+    marginTop: 4,
   },
-  // --- FIM DOS NOVOS ESTILOS ---
-  reportHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6, alignItems: 'center' },
-  reportTitle: { fontSize: 16, fontWeight: 'bold', color: '#2c3e50', flex: 1, marginRight: 10 },
-  reportDate: { fontSize: 12, color: '#7f8c8d' },
-  reportDescription: { fontSize: 14, color: '#444', marginVertical: 6 },
-  locationContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-  reportLocation: { marginLeft: 5, fontSize: 13, color: '#7f8c8d' },
-  reportFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },
-  badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  anonymous: { backgroundColor: '#f0f0f0', color: '#888' },
-  identified: { backgroundColor: '#e9fbe9', color: '#27ae60' },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  statusBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
+  reportAuthor: { fontSize: 12, color: '#7f8c8d', fontStyle: 'italic' },
+  reportStats: { flexDirection: 'row', alignItems: 'center' },
+  statText: { fontSize: 12, color: '#7f8c8d', marginLeft: 4 },
   addButton: {
     position: 'absolute',
     right: 25,
@@ -347,39 +345,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     elevation: 5,
   },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, marginTop: 50 },
+  emptyContainer: { alignItems: 'center', padding: 40 },
   emptyText: { color: '#888', fontSize: 16, textAlign: 'center' },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    padding: 25,
-    borderRadius: 12,
-    width: '80%',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    textAlign: 'center',
-    marginBottom: 15,
-  },
-  filterOption: { paddingVertical: 12, borderRadius: 8, paddingHorizontal: 10 },
-  filterOptionSelected: { backgroundColor: '#e9fbe9' },
-  filterOptionText: { fontSize: 16, color: '#2c3e50', textAlign: 'center' },
-  closeButton: {
-    marginTop: 20,
-    backgroundColor: '#27ae60',
-    padding: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  closeButtonText: { color: '#fff', fontWeight: 'bold' },
 });
 
 export default HomeScreen;

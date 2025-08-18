@@ -20,13 +20,15 @@ const pool = new Pool({
   port: process.env.DB_PORT || 5432,
 });
 
-// ... (configuração do Cloudinary e Multer) ...
+// Configuração do Cloudinary
 const cloudinary = require('cloudinary').v2;
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
+
+// Configuração do Multer para memória
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 },
@@ -125,7 +127,7 @@ app.post('/auth/forgot-password', async (req, res) => {
   }
 });
 
-// --- ROTA ADICIONADA: APENAS PARA VERIFICAR O CÓDIGO ---
+// ROTA PARA VERIFICAR O CÓDIGO DE REDEFINIÇÃO
 app.post('/auth/verify-reset-code', async (req, res) => {
   try {
     const { email, code } = req.body;
@@ -149,7 +151,6 @@ app.post('/auth/verify-reset-code', async (req, res) => {
 app.post('/auth/reset-password', async (req, res) => {
   try {
     const { email, code, newPassword } = req.body;
-    // Revalidamos o código aqui por segurança
     const userResult = await pool.query(
       'SELECT id FROM users WHERE email = $1 AND reset_password_code = $2 AND reset_password_expires > NOW()',
       [email, code]
@@ -177,25 +178,135 @@ app.post('/auth/reset-password', async (req, res) => {
 // Rota para buscar denúncias
 app.get('/api/reports', async (req, res) => {
   try {
-    const { userId, filter } = req.query;
-    let query = `SELECT r.*, u.name as user_name FROM reports r LEFT JOIN users u ON r.user_id = u.id`;
+    const { userId, filter, status, searchTerm } = req.query;
+    let query = `
+      SELECT r.*, 
+             u.name as user_name,
+             (SELECT COUNT(*) FROM likes WHERE report_id = r.id) as likes_count,
+             (SELECT COUNT(*) FROM comments WHERE report_id = r.id) as comments_count
+      FROM reports r 
+      LEFT JOIN users u ON r.user_id = u.id
+    `;
     const params = [];
+    const whereClauses = [];
     let paramCount = 0;
 
     if (userId && !isNaN(userId)) {
-      query += ` WHERE r.user_id = $${++paramCount}`;
+      paramCount++;
+      whereClauses.push(`r.user_id = $${paramCount}`);
       params.push(parseInt(userId));
-    } else if (filter === 'anonymous') {
-      query += ' WHERE r.is_anonymous = true';
-    } else if (filter === 'identified') {
-      query += ' WHERE r.is_anonymous = false';
     }
+    if (filter === 'anonymous') {
+      whereClauses.push('r.is_anonymous = true');
+    } else if (filter === 'identified') {
+      whereClauses.push('r.is_anonymous = false');
+    }
+    if (status) {
+      paramCount++;
+      whereClauses.push(`r.status = $${paramCount}`);
+      params.push(status);
+    }
+    if (searchTerm) {
+      paramCount++;
+      whereClauses.push(`(r.title ILIKE $${paramCount} OR r.description ILIKE $${paramCount})`);
+      params.push(`%${searchTerm}%`);
+    }
+
+    if (whereClauses.length > 0) {
+      query += ' WHERE ' + whereClauses.join(' AND ');
+    }
+
     query += ' ORDER BY r.created_at DESC';
+    
     const reports = await pool.query(query, params);
     res.json({ reports: reports.rows });
   } catch (error) {
     console.error('Erro ao buscar denúncias:', error);
     res.status(500).json({ message: 'Erro ao buscar denúncias' });
+  }
+});
+
+// ROTA CORRIGIDA: movida para ANTES de /api/reports/:id
+app.get('/api/reports/popular', async (req, res) => {
+    try {
+      const query = `
+        SELECT r.*, 
+               u.name as user_name,
+               (SELECT COUNT(*) FROM likes WHERE report_id = r.id) as likes_count,
+               (SELECT COUNT(*) FROM comments WHERE report_id = r.id) as comments_count
+        FROM reports r 
+        LEFT JOIN users u ON r.user_id = u.id
+        WHERE r.status != 'resolved'
+        ORDER BY likes_count DESC, comments_count DESC
+        LIMIT 10
+      `;
+      const reports = await pool.query(query);
+      res.json({ reports: reports.rows });
+    } catch (error) {
+      console.error('Erro ao buscar denúncias populares:', error);
+      res.status(500).json({ message: 'Erro ao buscar denúncias populares' });
+    }
+  });
+
+app.get('/api/reports/stats/agency', async (req, res) => {
+  try {
+    const pending = await pool.query("SELECT COUNT(*) FROM reports WHERE status = 'pending'");
+    const in_progress = await pool.query("SELECT COUNT(*) FROM reports WHERE status = 'in_progress'");
+    const resolved = await pool.query("SELECT COUNT(*) FROM reports WHERE status = 'resolved'");
+    const total = await pool.query("SELECT COUNT(*) FROM reports");
+
+    res.json({
+      stats: {
+        pending: parseInt(pending.rows[0].count),
+        inProgress: parseInt(in_progress.rows[0].count),
+        resolved: parseInt(resolved.rows[0].count),
+        total: parseInt(total.rows[0].count),
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao buscar estatísticas da agência:', error);
+    res.status(500).json({ message: 'Erro ao buscar estatísticas' });
+  }
+});
+
+app.get('/api/reports/:reportId/agency-notes', async (req, res) => {
+  try {
+    const { reportId } = req.params;
+    const notes = await pool.query(
+      `SELECT an.*, u.name as user_name, u.profile_pic as user_avatar 
+       FROM agency_notes an
+       JOIN users u ON an.user_id = u.id
+       WHERE an.report_id = $1 
+       ORDER BY an.created_at DESC`,
+      [reportId]
+    );
+    res.json({ notes: notes.rows });
+  } catch (error) {
+    console.error('Erro ao buscar notas internas:', error);
+    res.status(500).json({ message: 'Erro ao buscar notas' });
+  }
+});
+
+app.post('/api/reports/:reportId/agency-notes', async (req, res) => {
+  try {
+    const { reportId } = req.params;
+    const { userId, content } = req.body;
+    const newNote = await pool.query(
+      `INSERT INTO agency_notes (report_id, user_id, content) VALUES ($1, $2, $3) RETURNING *`,
+      [reportId, userId, content]
+    );
+    const result = await pool.query(
+      `SELECT an.*, u.name as user_name, u.profile_pic as user_avatar 
+       FROM agency_notes an
+       JOIN users u ON an.user_id = u.id
+       WHERE an.id = $1`,
+       [newNote.rows[0].id]
+    );
+    res.status(201).json({ note: result.rows[0] });
+  } catch (error)
+  {
+    console.error('Erro ao adicionar nota interna:', error);
+    res.status(500).json({ message: 'Erro ao adicionar nota' });
   }
 });
 
@@ -314,7 +425,6 @@ app.post('/api/reports/:id/comments', async (req, res) => {
     res.status(201).json({ 
       comment: {
         ...newComment.rows[0],
-        user: user.rows[0],
         user_name: user.rows[0].name,
         user_avatar: user.rows[0].profile_pic
       }
@@ -480,16 +590,40 @@ app.get('/users/:id/profile', async (req, res) => {
 app.put('/users/:id/profile', async (req, res) => {
   try {
     const { id } = req.params;
-    const { bio } = req.body;
+    const fields = req.body;
+
+    const allowedUpdates = ['bio', 'profile_pic', 'name', 'nickname', 'phone'];
+    const updates = {};
+    for (const key in fields) {
+      if (allowedUpdates.includes(key) && fields[key] !== undefined) {
+        updates[key] = fields[key];
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: 'Nenhum campo válido para atualização foi fornecido.' });
+    }
+
+    const setClause = Object.keys(updates)
+      .map((key, index) => `"${key}" = $${index + 1}`)
+      .join(', ');
+    const values = Object.values(updates);
     
-    const updatedUser = await pool.query(
-      'UPDATE users SET bio = $1 WHERE id = $2 RETURNING id, name, email, nickname, profile_pic, bio',
-      [bio, id]
-    );
+    const query = `UPDATE users SET ${setClause} WHERE id = $${values.length + 1} RETURNING id, name, email, nickname, profile_pic, bio`;
+    values.push(id);
+
+    const updatedUser = await pool.query(query, values);
     
+    if (updatedUser.rows.length === 0) {
+      return res.status(404).json({ message: 'Usuário não encontrado.' });
+    }
+
     res.json({ user: updatedUser.rows[0] });
   } catch (error) {
-    console.error(error);
+    console.error('Erro ao atualizar perfil:', error);
+    if (error.code === '23505' && error.constraint === 'users_nickname_key') {
+      return res.status(400).json({ message: 'Este apelido já está em uso.' });
+    }
     res.status(500).json({ message: 'Erro ao atualizar perfil' });
   }
 });
@@ -537,52 +671,74 @@ app.delete('/api/reports/:id', async (req, res) => {
   }
 });
 
-// Rota para obter estatísticas do usuário
+// --- ROTA DE ESTATÍSTICAS CORRIGIDA E OTIMIZADA ---
 app.get('/users/:id/stats', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const reportsCount = await pool.query(
-      'SELECT COUNT(*) FROM reports WHERE user_id = $1',
-      [id]
-    );
-    
-    const likesReceived = await pool.query(
-      `SELECT COUNT(*) FROM likes l
-       JOIN reports r ON l.report_id = r.id
-       WHERE r.user_id = $1`,
-      [id]
-    );
-    
-    const commentsCount = await pool.query(
-      'SELECT COUNT(*) FROM comments WHERE user_id = $1',
-      [id]
-    );
-    
+    const query = `
+      SELECT
+        (SELECT COUNT(*) FROM reports WHERE user_id = $1) as reports_count,
+        (SELECT COUNT(*) FROM likes l JOIN reports r ON l.report_id = r.id WHERE r.user_id = $1) as likes_received,
+        (SELECT COUNT(*) FROM comments WHERE user_id = $1) as comments_count
+    `;
+
+    const statsResult = await pool.query(query, [id]);
+    const stats = statsResult.rows[0];
+
     res.json({
       stats: {
-        reportsCount: parseInt(reportsCount.rows[0].count),
-        likesReceived: parseInt(likesReceived.rows[0].count),
-        commentsCount: parseInt(commentsCount.rows[0].count)
+        reportsCount: parseInt(stats.reports_count),
+        likesReceived: parseInt(stats.likes_received),
+        commentsCount: parseInt(stats.comments_count)
       }
     });
   } catch (error) {
-    console.error(error);
+    console.error('Erro ao buscar estatísticas:', error);
     res.status(500).json({ message: 'Erro ao buscar estatísticas' });
   }
 });
 
-// Configuração do Multer para upload de imagens
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
-  filename: (req, file, cb) => {
-    cb(null, `report-${Date.now()}${path.extname(file.originalname)}`);
+// Rota para buscar conquistas do usuário
+app.get('/users/:id/achievements', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const allAchievements = [
+      { id: 'first_report', name: 'Iniciante Cívico', description: 'Fez sua primeira denúncia.', icon: 'flag' },
+      { id: 'five_reports', name: 'Guardião Atento', description: 'Fez 5 ou mais denúncias.', icon: 'security' },
+      { id: 'ten_comments', name: 'Voz da Comunidade', description: 'Fez 10 ou mais comentários.', icon: 'comment' },
+      { id: 'case_solved', name: 'Missão Cumprida', description: 'Teve sua primeira denúncia resolvida.', icon: 'check-circle' },
+      { id: 'popular_report', name: 'Influente', description: 'Recebeu 10 curtidas em uma denúncia.', icon: 'favorite' },
+    ];
+
+    const reportsResult = await pool.query('SELECT status, (SELECT COUNT(*) FROM likes WHERE report_id = r.id) as likes_count FROM reports r WHERE user_id = $1', [id]);
+    const commentsCountResult = await pool.query('SELECT COUNT(*) FROM comments WHERE user_id = $1', [id]);
+    
+    const reports = reportsResult.rows;
+    const reportsCount = reports.length;
+    const commentsCount = parseInt(commentsCountResult.rows[0].count);
+
+    const earnedAchievements = new Set();
+
+    if (reportsCount >= 1) earnedAchievements.add('first_report');
+    if (reportsCount >= 5) earnedAchievements.add('five_reports');
+    if (commentsCount >= 10) earnedAchievements.add('ten_comments');
+    if (reports.some(r => r.status === 'resolved')) earnedAchievements.add('case_solved');
+    if (reports.some(r => r.likes_count >= 10)) earnedAchievements.add('popular_report');
+
+    const finalAchievements = allAchievements.map(ach => ({
+      ...ach,
+      earned: earnedAchievements.has(ach.id),
+    }));
+
+    res.json({ achievements: finalAchievements });
+
+  } catch (error) {
+    console.error('Erro ao buscar conquistas:', error);
+    res.status(500).json({ message: 'Erro ao buscar conquistas' });
   }
 });
-
-
 
 // Rota para upload
 app.post('/api/upload', upload.single('media'), (req, res) => {
@@ -590,7 +746,6 @@ app.post('/api/upload', upload.single('media'), (req, res) => {
     return res.status(400).json({ message: 'Nenhum arquivo enviado.' });
   }
 
-  // Função que envia o buffer do arquivo para o Cloudinary
   const uploadStream = (buffer, options) => {
     return new Promise((resolve, reject) => {
       cloudinary.uploader.upload_stream(options, (error, result) => {
@@ -608,11 +763,10 @@ app.post('/api/upload', upload.single('media'), (req, res) => {
     resource_type: 'auto',
   };
 
-  // Executa o upload e retorna a URL
   uploadStream(req.file.buffer, options)
     .then(result => {
       res.status(200).json({
-        media_url: result.secure_url, // Usar a URL segura é a melhor prática
+        media_url: result.secure_url,
         media_type: result.resource_type,
       });
     })
