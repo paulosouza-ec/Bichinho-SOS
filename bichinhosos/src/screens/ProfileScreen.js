@@ -20,14 +20,14 @@ const ProfileScreen = ({ navigation, route }) => {
   const { userId } = route.params;
   const [user, setUser] = useState(null);
   const [reports, setReports] = useState([]);
-  const [achievements, setAchievements] = useState([]); // NOVO: State para conquistas
+  const [achievements, setAchievements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [bio, setBio] = useState('');
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [stats, setStats] = useState({ reportsCount: 0, likesReceived: 0, commentsCount: 0 });
-  const [activeTab, setActiveTab] = useState('activity'); // NOVO: Controla a aba ativa
+  const [activeTab, setActiveTab] = useState('activity');
 
   React.useEffect(() => {
     loadProfileData();
@@ -41,7 +41,7 @@ const ProfileScreen = ({ navigation, route }) => {
         authService.getUserProfile(userId),
         reportService.getUserReports(userId),
         reportService.getUserStats(userId),
-        reportService.getUserAchievements(userId) // NOVO: Busca as conquistas
+        reportService.getUserAchievements(userId)
       ]);
       
       setUser(userData);
@@ -63,7 +63,6 @@ const ProfileScreen = ({ navigation, route }) => {
     loadProfileData();
   };
 
-  // ... (funções deleteReport, updateBio, handleLogout, handleUpdateProfilePicture sem alterações) ...
   const deleteReport = async (reportId) => {
     Alert.alert(
       'Confirmar exclusão',
@@ -88,6 +87,7 @@ const ProfileScreen = ({ navigation, route }) => {
       ]
     );
   };
+
   const updateBio = async () => {
     try {
       const updatedUser = await authService.updateUserProfile(userId, { bio });
@@ -98,6 +98,7 @@ const ProfileScreen = ({ navigation, route }) => {
       Alert.alert('Erro', error.message);
     }
   };
+
   const handleLogout = () => {
     Alert.alert(
       "Sair",
@@ -117,30 +118,39 @@ const ProfileScreen = ({ navigation, route }) => {
       ]
     );
   };
+
   const handleUpdateProfilePicture = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (permissionResult.granted === false) {
       Alert.alert('Permissão necessária', 'É preciso permitir o acesso à galeria para alterar a foto.');
       return;
     }
+    
     const pickerResult = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.7,
     });
+    
     if (pickerResult.canceled) return;
     
     try {
       setIsUploading(true);
       const file = pickerResult.assets[0];
+      
+      // CORREÇÃO: Adiciona o tipo de arquivo explicitamente
+      file.type = `image/${file.uri.split('.').pop()}`;
+      
       const uploadResponse = await mediaService.uploadMedia(file);
       const updatedUser = await authService.updateUserProfile(userId, { 
         profile_pic: uploadResponse.media_url 
       });
+      
       setUser(prevUser => ({ ...prevUser, ...updatedUser }));
       Alert.alert('Sucesso', 'Foto de perfil atualizada!');
     } catch (error) {
+      console.error('Erro no upload:', error);
       Alert.alert('Erro no Upload', error.message);
     } finally {
       setIsUploading(false);

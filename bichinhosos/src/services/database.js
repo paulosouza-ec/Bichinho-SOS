@@ -4,26 +4,27 @@ export const mediaService = {
   uploadMedia: async (file) => {
     try {
       const formData = new FormData();
+      
+      // CORREÇÃO: Formato correto para React Native
       formData.append('media', {
         uri: file.uri,
-        type: `image/${file.uri.split('.').pop()}`, // ex: 'image/jpeg'
+        type: file.type || `image/${file.uri.split('.').pop()}`,
         name: `profile-${Date.now()}.${file.uri.split('.').pop()}`,
       });
 
-      // ALTERAÇÃO FEITA: O objeto 'headers' foi removido daqui.
-      // A biblioteca 'api' (Axios) irá adicionar o 'Content-Type' com o 'boundary' correto automaticamente
-      // ao detectar um objeto FormData.
-      const response = await api.post('/api/upload', formData);
+      const response = await api.post('/api/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
 
-      return response.data; // Retorna { media_url, media_type }
+      return response.data;
     } catch (error) {
       console.error('Erro no upload:', error.response?.data || error.message);
       throw new Error(error.response?.data?.message || 'Erro ao enviar mídia');
     }
   },
 };
-
-
 
 export const authService = {
   registerUser: async (userData) => {
@@ -54,7 +55,6 @@ export const authService = {
       throw new Error(error.response?.data?.message || 'Erro ao solicitar redefinição');
     }
   },
-
 
   resetPassword: async ({ email, code, newPassword }) => {
     try {
@@ -113,10 +113,8 @@ export const reportService = {
     }
   },
 
-  // --- FUNÇÃO ADICIONADA: PARA ATUALIZAR UMA DENÚNCIA ---
   updateReport: async (reportId, reportData, userId) => {
     try {
-      // Inclui o userId no corpo da requisição para verificação de autoria no backend
       const payload = { ...reportData, userId };
       const response = await api.put(`/api/reports/${reportId}`, payload);
       return response.data.report;
@@ -128,7 +126,7 @@ export const reportService = {
   getReports: async ({ userId, filter, status, searchTerm } = {}) => {
     try {
       const params = {};
-      if (userId) params.userId = userId; // Adicionado para o filtro "Minhas"
+      if (userId) params.userId = userId;
       if (filter) params.filter = filter;
       if (status) params.status = status;
       if (searchTerm) params.searchTerm = searchTerm;
@@ -167,7 +165,6 @@ export const reportService = {
     }
   },
   
-  // --- NOVO: Função para adicionar uma nota interna ---
   addAgencyNote: async (reportId, userId, content) => {
     try {
       const response = await api.post(`/api/reports/${reportId}/agency-notes`, { userId, content });
@@ -176,7 +173,6 @@ export const reportService = {
       throw new Error(error.response?.data?.message || 'Erro ao adicionar nota');
     }
   },
-
 
   getReportById: async (id) => {
     try {
@@ -299,10 +295,8 @@ export const reportService = {
     }
   },
 
-
   updateReportStatus: async (reportId, status, agencyId) => {
     try {
-      // --- ALTERADO: O nome da variável 'agencyId' foi mantido para consistência, mas representa o 'userId' do agente
       const response = await api.put(`/api/reports/${reportId}/status`, { status, agencyId });
       return response.data.report;
     } catch (error) {
