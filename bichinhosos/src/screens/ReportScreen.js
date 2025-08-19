@@ -207,7 +207,7 @@ const ReportScreen = ({ navigation, route }) => {
             </View>
             <View style={styles.inputContainer}>
               <MaterialIcons name="location-on" size={22} color="#888" style={styles.inputIcon} />
-              <TextInput style={styles.input} placeholder="Localização (opcional)" value={location} onChangeText={setLocation} placeholderTextColor="#888" />
+              <TextInput style={styles.input} placeholder="Localização*" value={location} onChangeText={setLocation} placeholderTextColor="#888" />
             </View>
           </View>
           

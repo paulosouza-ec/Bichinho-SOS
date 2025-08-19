@@ -187,12 +187,13 @@ const ReportDetailScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleEditComment = async (comment) => {
-    if (!editCommentText.trim()) return;
+  const handleEditComment = async () => {
+    if (!editCommentText.trim() || !editingComment) return;
     try {
-      const updated = await reportService.editComment(report.id, comment.id, user.id, editCommentText);
-      setComments(prev => prev.map(c => c.id === comment.id ? { ...c, content: updated.content } : c));
+      const updated = await reportService.editComment(report.id, editingComment, user.id, editCommentText);
+      setComments(prev => prev.map(c => c.id === editingComment ? { ...c, content: updated.content } : c));
       setEditingComment(null);
+      setEditCommentText('');
     } catch (error) {
       Alert.alert('Erro', error.message);
     }
@@ -234,6 +235,18 @@ const ReportDetailScreen = ({ route, navigation }) => {
     }
   };
 
+  const handleEdit = (comment) => {
+    if (comment === null) {
+      // Cancelar edição
+      setEditingComment(null);
+      setEditCommentText('');
+    } else {
+      // Iniciar edição
+      setEditingComment(comment.id);
+      setEditCommentText(comment.content);
+    }
+  };
+
   // --- COMPONENTES DE RENDERIZAÇÃO ---
 
   const renderRootComment = ({ section }) => {
@@ -247,12 +260,12 @@ const ReportDetailScreen = ({ route, navigation }) => {
                 item={rootComment}
                 user={user}
                 onReply={() => setReplyingTo(rootComment)}
-                onEdit={(comment) => { setEditingComment(comment.id); setEditCommentText(comment.content); }}
+                onEdit={handleEdit}
                 onDelete={confirmDeleteComment}
                 editingComment={editingComment}
                 editCommentText={editCommentText}
                 setEditCommentText={setEditCommentText}
-                handleEditComment={() => handleEditComment(rootComment)}
+                handleEditComment={handleEditComment}
             >
               {/* O botão de ver respostas agora é filho do BaseComment para garantir o alinhamento */}
               {replyCount > 0 && (
@@ -274,12 +287,12 @@ const ReportDetailScreen = ({ route, navigation }) => {
         item={item}
         user={user}
         onReply={() => setReplyingTo(item)}
-        onEdit={(comment) => { setEditingComment(comment.id); setEditCommentText(comment.content); }}
+        onEdit={handleEdit}
         onDelete={confirmDeleteComment}
         editingComment={editingComment}
         editCommentText={editCommentText}
         setEditCommentText={setEditCommentText}
-        handleEditComment={() => handleEditComment(item)}
+        handleEditComment={handleEditComment}
       />
     </View>
   );
