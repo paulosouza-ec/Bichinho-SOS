@@ -10,7 +10,7 @@ import {
   Alert,
   Image,
   TextInput,
-  ScrollView // Importar ScrollView
+  ScrollView 
 } from 'react-native';
 import { reportService } from '../services/database';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -30,13 +30,12 @@ const statusMap = {
 
 const HomeScreen = ({ navigation, route }) => {
   const [reports, setReports] = useState([]);
-  const [popularReports, setPopularReports] = useState([]); // NOVO: Para o carrossel
+  const [popularReports, setPopularReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [searchVisible, setSearchVisible] = useState(false); // NOVO: Controla a visibilidade da busca
+  const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // NOVO: Sistema de filtros unificado
   const [activeFilter, setActiveFilter] = useState({ type: 'all', value: null }); 
   
   const { user } = route.params;
@@ -61,11 +60,10 @@ const HomeScreen = ({ navigation, route }) => {
       if (searchQuery) {
         params.searchTerm = searchQuery;
       }
-
-      // Busca as denúncias e os populares em paralelo
+      
       const [reportsData, popularData] = await Promise.all([
         reportService.getReports(params),
-        reportService.getPopularReports() // Busca os populares
+        searchQuery ? [] : reportService.getPopularReports() // Não busca populares se estiver pesquisando
       ]);
       
       setReports(reportsData);
@@ -78,20 +76,24 @@ const HomeScreen = ({ navigation, route }) => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [activeFilter, refreshing, searchQuery]); // Adicionado searchQuery como dependência
+  }, [activeFilter, refreshing, searchQuery, user.id]);
   
   useFocusEffect(
     useCallback(() => {
       loadReports();
-    }, [activeFilter]) // Recarrega quando o filtro muda
+    }, [loadReports])
   );
 
   const handleRefresh = () => {
     setRefreshing(true);
-    loadReports();
+  };
+  
+  // --- FUNÇÃO DE BUSCA ALTERADA ---
+  // A busca agora é acionada ao submeter o texto
+  const handleSearchSubmit = () => {
+      loadReports();
   };
 
-  // Componente para o card de denúncia (usado nos dois carrosséis)
   const ReportCard = ({ item, isHorizontal }) => {
     let thumbnailUrl = item.photo_uri;
     if (item.media_type === 'video' && item.photo_uri) {
@@ -133,7 +135,6 @@ const HomeScreen = ({ navigation, route }) => {
     );
   };
 
-  // Componente para os chips de filtro
   const FilterChips = () => {
     const filters = [
       { label: 'Todas', type: 'all' },
@@ -160,33 +161,42 @@ const HomeScreen = ({ navigation, route }) => {
 
   return (
     <View style={styles.container}>
-      {/* --- CABEÇALHO REDESENHADO --- */}
-      <View style={styles.header}>
-        {searchVisible ? (
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Buscar por título ou descrição..."
-            placeholderTextColor="#ccc"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onSubmitEditing={loadReports}
-            autoFocus
-          />
-        ) : (
-          <Text style={styles.headerTitle}>BichinhoSOS</Text>
-        )}
-        <View style={styles.headerIcons}>
-          <TouchableOpacity onPress={() => setSearchVisible(!searchVisible)}>
-            <MaterialIcons name={searchVisible ? "close" : "search"} size={26} color="#fff" />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            onPress={() => navigation.navigate('Profile', { userId: user.id })}
-            style={{ marginLeft: 15 }}
-          >
-            <MaterialIcons name="account-circle" size={26} color="#fff" />
-          </TouchableOpacity>
+        {/* --- CABEÇALHO TOTALMENTE REDESENHADO --- */}
+        <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+            <View>
+                <Text style={styles.greetingText}>Olá,</Text>
+                <Text style={styles.userNameText}>{user.name || 'Usuário'}</Text>
+            </View>
+            <View style={styles.headerIconsContainer}>
+                <TouchableOpacity onPress={() => setSearchVisible(!searchVisible)} style={styles.iconButton}>
+                    <MaterialIcons name={searchVisible ? "close" : "search"} size={26} color="#2c3e50" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: user.id })}>
+                    <Image 
+                        source={{ uri: user.profile_pic || 'https://cdn-icons-png.flaticon.com/512/1946/1946429.png' }}
+                        style={styles.profileImage}
+                    />
+                </TouchableOpacity>
+            </View>
         </View>
-      </View>
+
+        {/* --- NOVA BARRA DE BUSCA ANIMADA (APARECE ABAIXO) --- */}
+        {searchVisible && (
+            <View style={styles.searchBarContainer}>
+                <View style={styles.searchInputContainer}>
+                    <MaterialIcons name="search" size={22} color="#888" />
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="Buscar por palavra-chave..."
+                        placeholderTextColor="#888"
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        onSubmitEditing={handleSearchSubmit}
+                        returnKeyType="search"
+                    />
+                </View>
+            </View>
+        )}
 
       {loading && !refreshing ? (
         <ActivityIndicator size="large" color="#27ae60" style={{ flex: 1 }} />
@@ -195,7 +205,6 @@ const HomeScreen = ({ navigation, route }) => {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#27ae60']} />}
         >
-          {/* --- CARROSSEL DE POPULARES --- */}
           {popularReports.length > 0 && !searchQuery && (
             <View>
               <Text style={styles.sectionTitle}>Populares na Comunidade</Text>
@@ -210,10 +219,8 @@ const HomeScreen = ({ navigation, route }) => {
             </View>
           )}
 
-          {/* --- FILTROS INTELIGENTES --- */}
           {!searchQuery && <FilterChips />}
 
-          {/* --- LISTA PRINCIPAL --- */}
           <Text style={styles.sectionTitle}>
             {searchQuery ? `Resultados para "${searchQuery}"` : 'Denúncias Recentes'}
           </Text>
@@ -240,26 +247,63 @@ const HomeScreen = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f2f5' },
+  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  // --- ESTILOS DO NOVO HEADER ---
   header: {
-    backgroundColor: '#27ae60',
-    paddingTop: 50,
-    paddingBottom: 20,
+    backgroundColor: '#fff',
+    paddingBottom: 15,
     paddingHorizontal: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee'
   },
-  headerTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
-  headerIcons: { flexDirection: 'row' },
+  greetingText: {
+    fontSize: 16,
+    color: '#7f8c8d',
+  },
+  userNameText: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+  },
+  headerIconsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iconButton: {
+    marginRight: 15,
+  },
+  profileImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#27ae60',
+  },
+  searchBarContainer: {
+    backgroundColor: '#fff',
+    padding: 10,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee'
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f2f5',
+    borderRadius: 12,
+    paddingHorizontal: 15,
+  },
   searchInput: {
     flex: 1,
-    color: '#fff',
+    height: 45,
+    marginLeft: 10,
     fontSize: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#fff',
-    paddingBottom: 5,
+    color: '#333'
   },
+  // --- FIM DOS ESTILOS DO HEADER ---
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -297,7 +341,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   horizontalReportItem: {
-    width: 280, // Largura do card horizontal
+    width: 280,
     marginRight: 15,
   },
   mediaPreview: {

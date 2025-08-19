@@ -15,6 +15,7 @@ import {
 import { reportService } from '../services/database';
 import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import moment from 'moment';
 import 'moment/locale/pt-br';
 
@@ -42,15 +43,19 @@ const AgencyHomeScreen = ({ navigation, route }) => {
   const [refreshing, setRefreshing] = useState(false);
   const { user } = route.params;
 
-  // States para filtros
   const [stats, setStats] = useState({ pending: 0, inProgress: 0, resolved: 0 });
   const [activeStatusFilter, setActiveStatusFilter] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // --- NOVO: State para controlar a visibilidade da busca ---
+  const [searchVisible, setSearchVisible] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const loadData = useCallback(async () => {
     try {
-      !refreshing && setLoading(true);
-      // Busca tanto as denúncias quanto as estatísticas em paralelo
+      if (!refreshing && !loading) {
+        setLoading(true);
+      }
       const [reportsData, statsData] = await Promise.all([
         reportService.getReports({ status: activeStatusFilter, searchTerm }),
         reportService.getAgencyStats()
@@ -67,7 +72,7 @@ const AgencyHomeScreen = ({ navigation, route }) => {
 
   useEffect(() => {
     loadData();
-  }, [activeStatusFilter]); // Recarrega quando o filtro de status muda
+  }, [activeStatusFilter]);
 
   useFocusEffect(
     useCallback(() => {
@@ -77,7 +82,6 @@ const AgencyHomeScreen = ({ navigation, route }) => {
 
   const handleRefresh = () => {
     setRefreshing(true);
-    loadData();
   };
   
   const handleSearch = () => {
@@ -139,18 +143,17 @@ const AgencyHomeScreen = ({ navigation, route }) => {
     );
   };
   
+  // --- ALTERADO: Barra de busca foi removida daqui ---
   const ListHeader = () => (
     <>
-      {/* Seção de Estatísticas */}
       <View style={styles.statsContainer}>
         <StatCard icon="exclamation-circle" title="Pendentes" value={stats.pending} color="#f39c12" />
         <StatCard icon="tasks" title="Em Andamento" value={stats.inProgress} color="#9b59b6" />
         <StatCard icon="check-circle" title="Resolvidas" value={stats.resolved} color="#2ecc71" />
       </View>
 
-      {/* Seção de Filtros */}
       <View style={styles.filterContainer}>
-        <Text style={styles.filterTitle}>Filtros</Text>
+        <Text style={styles.filterTitle}>Filtrar por Status</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <TouchableOpacity 
             style={[styles.filterButton, !activeStatusFilter && styles.filterButtonActive]}
@@ -169,31 +172,47 @@ const AgencyHomeScreen = ({ navigation, route }) => {
           ))}
         </ScrollView>
       </View>
-      
-      {/* Barra de Busca */}
-      <View style={styles.searchContainer}>
-        <TextInput 
-          style={styles.searchInput}
-          placeholder="Buscar por palavra-chave..."
-          value={searchTerm}
-          onChangeText={setSearchTerm}
-          onSubmitEditing={handleSearch}
-        />
-        <TouchableOpacity onPress={handleSearch} style={styles.searchButton}>
-            <MaterialIcons name="search" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
     </>
   );
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Painel de Denúncias</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: user.id })}>
-          <MaterialIcons name="account-circle" size={30} color="#fff" />
-        </TouchableOpacity>
+      {/* --- NOVO HEADER PERSONALIZADO --- */}
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+          <View>
+              <Text style={styles.greetingText}>Painel da Agência</Text>
+              <Text style={styles.userNameText}>{user.name || 'Organização'}</Text>
+          </View>
+          <View style={styles.headerIconsContainer}>
+              <TouchableOpacity onPress={() => setSearchVisible(!searchVisible)} style={styles.iconButton}>
+                  <MaterialIcons name={searchVisible ? "close" : "search"} size={26} color="#2c3e50" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: user.id })}>
+                  <Image 
+                      source={{ uri: user.profile_pic || 'https://cdn-icons-png.flaticon.com/512/1946/1946429.png' }}
+                      style={styles.profileImage}
+                  />
+              </TouchableOpacity>
+          </View>
       </View>
+
+      {/* --- NOVA BARRA DE BUSCA --- */}
+      {searchVisible && (
+          <View style={styles.searchBarContainer}>
+              <View style={styles.searchInputContainer}>
+                  <MaterialIcons name="search" size={22} color="#888" />
+                  <TextInput
+                      style={styles.searchInput}
+                      placeholder="Buscar por palavra-chave..."
+                      placeholderTextColor="#888"
+                      value={searchTerm}
+                      onChangeText={setSearchTerm}
+                      onSubmitEditing={handleSearch}
+                      returnKeyType="search"
+                  />
+              </View>
+          </View>
+      )}
 
       {loading && !refreshing ? (
         <ActivityIndicator size="large" color="#27ae60" style={{ marginTop: 50 }}/>
@@ -220,18 +239,62 @@ const AgencyHomeScreen = ({ navigation, route }) => {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f0f2f5' },
+    // --- NOVOS ESTILOS DE HEADER ---
     header: {
-      backgroundColor: '#27ae60',
-      paddingTop: 50,
-      paddingBottom: 20,
+      backgroundColor: '#fff',
+      paddingBottom: 15,
       paddingHorizontal: 20,
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      borderBottomLeftRadius: 15,
-      borderBottomRightRadius: 15,
+      borderBottomWidth: 1,
+      borderBottomColor: '#eee'
     },
-    headerTitle: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
+    greetingText: {
+      fontSize: 16,
+      color: '#7f8c8d',
+    },
+    userNameText: {
+      fontSize: 22,
+      fontWeight: 'bold',
+      color: '#2c3e50',
+    },
+    headerIconsContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    iconButton: {
+      marginRight: 15,
+    },
+    profileImage: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      borderWidth: 2,
+      borderColor: '#27ae60',
+    },
+    searchBarContainer: {
+      backgroundColor: '#fff',
+      padding: 10,
+      paddingHorizontal: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: '#eee'
+    },
+    searchInputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#f0f2f5',
+      borderRadius: 12,
+      paddingHorizontal: 15,
+    },
+    searchInput: {
+      flex: 1,
+      height: 45,
+      marginLeft: 10,
+      fontSize: 16,
+      color: '#333'
+    },
+    // --- FIM DOS ESTILOS DE HEADER ---
     statsContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -285,30 +348,6 @@ const styles = StyleSheet.create({
     },
     filterTextActive: {
       color: '#fff',
-    },
-    searchContainer: {
-      flexDirection: 'row',
-      marginBottom: 20,
-    },
-    searchInput: {
-      flex: 1,
-      backgroundColor: '#fff',
-      borderRadius: 10,
-      paddingHorizontal: 15,
-      height: 50,
-      elevation: 2,
-      borderTopRightRadius: 0,
-      borderBottomRightRadius: 0,
-    },
-    searchButton: {
-      width: 50,
-      height: 50,
-      backgroundColor: '#27ae60',
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderTopRightRadius: 10,
-      borderBottomRightRadius: 10,
-      elevation: 2,
     },
     reportItem: {
       backgroundColor: '#fff',
