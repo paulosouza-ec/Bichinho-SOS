@@ -104,6 +104,8 @@ const ReportDetailScreen = ({ route, navigation }) => {
   const [editingComment, setEditingComment] = useState(null);
   const [editCommentText, setEditCommentText] = useState('');
   const [expandedComments, setExpandedComments] = useState([]);
+  const [canEditReport, setCanEditReport] = useState(false);
+  const [editTimeExpired, setEditTimeExpired] = useState(false);
 
   const commentSections = useMemo(() => {
     const rootComments = [];
@@ -149,6 +151,30 @@ const ReportDetailScreen = ({ route, navigation }) => {
     });
     return unsubscribe;
   }, [navigation, route.params?.updatedReport]);
+
+  useEffect(() => {
+    // Verificar se o usuário pode editar a denúncia
+    checkEditPermission();
+  }, [report, user]);
+
+  const checkEditPermission = () => {
+    if (!report.user_id || !user) {
+      setCanEditReport(false);
+      return;
+    }
+
+    // Verificar se o usuário é o autor da denúncia
+    const isAuthor = report.user_id === user.id;
+    
+    // Verificar se o tempo de edição expirou (1 hora)
+    const createdAt = new Date(report.created_at);
+    const now = new Date();
+    const oneHourInMilliseconds = 60 * 60 * 1000;
+    const timeExpired = now - createdAt > oneHourInMilliseconds;
+    
+    setCanEditReport(isAuthor && !timeExpired);
+    setEditTimeExpired(timeExpired);
+  };
 
   const loadData = async () => {
     try {
@@ -235,6 +261,17 @@ const ReportDetailScreen = ({ route, navigation }) => {
     }
   };
 
+  const handleEditReport = () => {
+    if (editTimeExpired) {
+      Alert.alert('Tempo Expirado', 'O tempo para editar esta denúncia expirou (limite de 1 hora).');
+      return;
+    }
+    
+    if (canEditReport) {
+      navigation.navigate('Report', { user, reportToEdit: report });
+    }
+  };
+
   const handleEdit = (comment) => {
     if (comment === null) {
       // Cancelar edição
@@ -297,7 +334,6 @@ const ReportDetailScreen = ({ route, navigation }) => {
     </View>
   );
   
-  // CORRIGIDO: O conteúdo do card foi restaurado aqui
   const renderListHeader = () => (
     <>
       <View style={styles.card}>
@@ -361,12 +397,14 @@ const ReportDetailScreen = ({ route, navigation }) => {
           <Ionicons name="arrow-back" size={26} color="#2c3e50" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Detalhes</Text>
-        <TouchableOpacity 
-            onPress={() => navigation.navigate('Report', { user, reportToEdit: report })} 
+        {canEditReport && (
+          <TouchableOpacity 
+            onPress={handleEditReport}
             style={styles.headerButton}
-        >
+          >
             <MaterialIcons name="edit" size={24} color="#2c3e50" />
-        </TouchableOpacity>
+          </TouchableOpacity>
+        )}
       </View>
       
       <KeyboardAvoidingView
